@@ -163,6 +163,7 @@ import {
   });
 
   const runtime = createGameRuntimeResource();
+  let birdLandedAfterCrash = false;
 
   const setBirdPose = (idx: number): void => {
     birdSprite.texture = birdFrames[idx % birdFrames.length];
@@ -226,6 +227,7 @@ import {
     birdBody.setTransform(new Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
     birdBody.setLinearVelocity(new Vec2(0, 0));
     birdBody.setAngularVelocity(0);
+    birdBody.setFixedRotation(true);
     birdBody.setGravityScale(0);
 
     Position.x[birdEid] = BIRD_X;
@@ -239,6 +241,7 @@ import {
     runtime.flapFrame = 0;
     runtime.flapTimer = 0;
     runtime.bobTimer = 0;
+    birdLandedAfterCrash = false;
     hintText.visible = true;
     gameOverSprite.visible = false;
     background.reset();
@@ -265,6 +268,7 @@ import {
     const dataB = bodyB.getUserData() as { type?: string } | undefined;
 
     const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
+    const hitGround = dataA?.type === 'ground' || dataB?.type === 'ground';
     const hitPipeGroundOrCeiling =
       dataA?.type === 'pipe' ||
       dataB?.type === 'pipe' ||
@@ -275,9 +279,17 @@ import {
 
     if (hitBird && hitPipeGroundOrCeiling && !runtime.gameOver) {
       runtime.gameOver = true;
+      birdBody.setFixedRotation(false);
+      birdBody.setAngularVelocity(6);
       gameOverSprite.visible = true;
       hintText.text = 'Click or press Space to restart';
       hintText.visible = true;
+    }
+
+    if (runtime.gameOver && hitBird && hitGround && !birdLandedAfterCrash) {
+      birdLandedAfterCrash = true;
+      birdBody.setAngularVelocity(0);
+      birdBody.setFixedRotation(true);
     }
   });
 
@@ -303,8 +315,12 @@ import {
       return;
     }
 
-    if (!runtime.gameOver) {
+    if (runtime.started) {
       physicsWorld.step(dt);
+      syncBirdFromPhysics({ birdQuery, stores });
+    }
+
+    if (!runtime.gameOver) {
       const currentSpeed = getPipeSpeedByScore(runtime.score);
       spawnPipesByMap();
 
@@ -322,8 +338,6 @@ import {
         scoreText.text = String(runtime.score);
       }
 
-      syncBirdFromPhysics({ birdQuery, stores });
-
       runtime.flapTimer += dt;
       if (runtime.flapTimer >= 0.12) {
         runtime.flapTimer = 0;
@@ -333,6 +347,8 @@ import {
 
       const vy = birdBody.getLinearVelocity().y;
       birdSprite.rotation = Math.max(-0.6, Math.min(1.2, vy * 0.08));
+    } else if (!birdLandedAfterCrash) {
+      birdSprite.rotation = Math.min(1.45, birdSprite.rotation + dt * 5);
     }
 
     if (!runtime.gameOver) {
