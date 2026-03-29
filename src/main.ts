@@ -5,6 +5,7 @@ import type { Spritesheet } from 'pixi.js';
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config/constants';
 import { preloadSounds } from './game/audio/sound';
 import { MAX_ENTITIES } from './game/ecs/components';
+import { createShareImageCapture } from './game/app/create-share-image-capture';
 import { createShareButton } from './game/app/create-share-button';
 import {
   createPhysicsBackend,
@@ -46,6 +47,8 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
   await preloadSounds();
 
   const lcpPoster = document.getElementById('lcp-poster');
+  const lcpPosterImage = lcpPoster?.querySelector('img');
+  const shareLogoSrc = lcpPosterImage?.currentSrc || lcpPosterImage?.getAttribute('src');
   if (lcpPoster) {
     lcpPoster.remove();
   }
@@ -65,20 +68,14 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
     scene,
     sheet,
   });
+  const captureShareImage = createShareImageCapture({
+    app,
+    scene,
+    runtime,
+    shareUrl: window.location.href,
+    logoSrc: shareLogoSrc,
+  });
   let lastPhase: GamePhase | null = null;
-
-  const captureDeathScreenshot = async (): Promise<void> => {
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => resolve());
-    });
-
-    const screenshotImage = await app.renderer.extract.image({
-      target: app.stage,
-      format: 'png',
-    });
-
-    shareButton.setScreenshotSrc(screenshotImage.currentSrc || screenshotImage.src || null);
-  };
 
   app.canvas.addEventListener('pointerdown', runtime.flap);
   window.addEventListener('keydown', (event) => {
@@ -102,7 +99,9 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
     }
 
     if (runtime.consumeScreenshotRequest()) {
-      void captureDeathScreenshot();
+      void captureShareImage().then((imageSrc) => {
+        shareButton.setScreenshotSrc(imageSrc);
+      });
     }
   });
 })();

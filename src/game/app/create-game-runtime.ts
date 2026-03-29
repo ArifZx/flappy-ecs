@@ -28,6 +28,7 @@ export type GameRuntimeController = {
   flap: () => void;
   update: (dt: number) => void;
   getPhase: () => GamePhase;
+  getScore: () => number;
   consumeScreenshotRequest: () => boolean;
 };
 
@@ -207,6 +208,7 @@ export const createGameRuntime = ({
     flap,
     update,
     getPhase: () => runtime.phase,
+    getScore: () => runtime.score,
     consumeScreenshotRequest: () => {
       const requested = screenshotRequested;
       screenshotRequested = false;
