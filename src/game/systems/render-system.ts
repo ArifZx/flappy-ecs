@@ -1,24 +1,24 @@
 import { BodyRef, Position, SpriteRef } from '../ecs/components';
 import { mToPx } from '../config/constants';
 import type { EcsQuery, EntityStores } from '../ecs/types';
+import type { PhysicsAdapter } from '../physics';
 
 type SyncBirdFromPhysicsParams = {
   birdQuery: EcsQuery;
-  stores: EntityStores;
+  physics: PhysicsAdapter;
 };
 
 export const syncBirdFromPhysics = ({
   birdQuery,
-  stores,
+  physics,
 }: SyncBirdFromPhysicsParams): void => {
   for (let i = 0; i < birdQuery.length; i += 1) {
     const eid = birdQuery[i];
-    const body = stores.bodies[BodyRef.id[eid]];
-    if (!body) continue;
+    const bodyId = BodyRef.id[eid];
+    if (physics.shared.active[bodyId] === 0) continue;
 
-    const pos = body.getPosition();
-    Position.x[eid] = mToPx(pos.x);
-    Position.y[eid] = mToPx(pos.y);
+    Position.x[eid] = mToPx(physics.shared.x[bodyId]);
+    Position.y[eid] = mToPx(physics.shared.y[bodyId]);
   }
 };
 

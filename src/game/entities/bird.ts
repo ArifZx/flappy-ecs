@@ -2,8 +2,6 @@ import { Container, Sprite } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { addComponent, addEntity } from 'bitecs';
 import type { World as EcsWorld } from 'bitecs';
-import { CircleShape, Vec2 } from 'planck';
-import type { Body, World as PlanckWorld } from 'planck';
 
 import { BIRD_START_Y, BIRD_X, pxToM } from '../config/constants';
 import {
@@ -14,10 +12,11 @@ import {
   SpriteRef,
 } from '../ecs/components';
 import type { EntityStores } from '../ecs/types';
+import type { PhysicsAdapter, PhysicsBodyHandle } from '../physics';
 
 export type BirdEntityBundle = {
   birdEid: number;
-  birdBody: Body;
+  birdBody: PhysicsBodyHandle;
   birdSprite: Sprite;
   birdFrames: Sprite['texture'][];
 };
@@ -31,7 +30,7 @@ export type RemoteBirdEntityBundle = {
 
 type CreateBirdEntityParams = {
   ecsWorld: EcsWorld;
-  physicsWorld: PlanckWorld;
+  physics: PhysicsAdapter;
   birdLayer: Container;
   sheet: Spritesheet;
   stores: EntityStores;
@@ -102,7 +101,7 @@ const createBirdVisualEntity = ({
 
 export const createBirdEntity = ({
   ecsWorld,
-  physicsWorld,
+  physics,
   birdLayer,
   sheet,
   stores,
@@ -123,21 +122,24 @@ export const createBirdEntity = ({
 
   addComponent(ecsWorld, birdEid, BodyRef);
 
-  const birdBody = physicsWorld.createDynamicBody({
-    position: new Vec2(pxToM(x), pxToM(y)),
-    fixedRotation: true,
-    linearDamping: 0,
+  const birdBody = physics.createBody({
+    entityId: birdEid,
+    x: pxToM(x),
+    y: pxToM(y),
+    shape: {
+      kind: 'dynamic-circle',
+      radius: pxToM(11),
+      density: 1,
+      friction: 0,
+      restitution: 0,
+      gravityScale: 0,
+      fixedRotation: true,
+      linearDamping: 0,
+    },
+    userData: { type: 'bird', eid: birdEid },
   });
-  birdBody.createFixture(new CircleShape(pxToM(11)), {
-    density: 1,
-    friction: 0,
-    restitution: 0,
-  });
-  birdBody.setGravityScale(0);
-  birdBody.setUserData({ type: 'bird', eid: birdEid });
 
-  BodyRef.id[birdEid] = birdEid;
-  stores.bodies[birdEid] = birdBody;
+  BodyRef.id[birdEid] = birdBody.bodyId;
 
   return {
     birdEid,

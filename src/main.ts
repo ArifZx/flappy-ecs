@@ -3,8 +3,6 @@ import './style.css';
 import { Application, Assets, Container, Sprite, Text } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { createWorld, entityExists, query } from 'bitecs';
-import { BoxShape, Vec2, World } from 'planck';
-import type { Contact } from 'planck';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -30,6 +28,13 @@ import { destroyEntity } from './game/ecs/entity-lifecycle';
 import { createBirdEntity } from './game/entities/bird';
 import { spawnPipePair } from './game/entities/pipe';
 import {
+  MainThreadPhysicsAdapter,
+  WorkerPhysicsAdapter,
+  canUseSharedArrayBufferPhysics,
+  type PhysicsAdapter,
+  type PhysicsContactEvent,
+} from './game/physics';
+import {
   createPipeMapProvider,
   type PipeMapEntry,
 } from './game/systems/pipe-map';
@@ -45,6 +50,8 @@ import {
   playSound,
   preloadSounds,
 } from './game/audio/sound';
+
+const PHYSICS_BACKEND: 'main-thread' | 'worker' = 'worker';
 
 (async () => {
   const app = new Application();
@@ -129,34 +136,64 @@ import {
   scene.addChild(gameOverSprite);
 
   const ecsWorld = createWorld();
-  const physicsWorld = new World(new Vec2(0, 24));
+  const useWorkerPhysics =
+    PHYSICS_BACKEND === 'worker' && canUseSharedArrayBufferPhysics();
+
+  console.log(`Using physics backend: ${useWorkerPhysics ? 'worker' : 'main-thread'}`);
+
+  if (PHYSICS_BACKEND === 'worker' && !useWorkerPhysics) {
+    console.warn(
+      'Worker physics disabled: SharedArrayBuffer is unavailable or crossOriginIsolated is false. Falling back to main-thread physics.',
+    );
+  }
+
+  const physics: PhysicsAdapter =
+    useWorkerPhysics
+      ? new WorkerPhysicsAdapter({
+          capacity: MAX_ENTITIES,
+          gravity: { x: 0, y: 24 },
+        })
+      : new MainThreadPhysicsAdapter({
+          capacity: MAX_ENTITIES,
+          gravity: { x: 0, y: 24 },
+        });
+  await physics.init();
 
   const stores: EntityStores = {
     sprites: new Array(MAX_ENTITIES).fill(null),
-    bodies: new Array(MAX_ENTITIES).fill(null),
   };
 
   const { birdEid, birdBody, birdSprite, birdFrames } = createBirdEntity({
     ecsWorld,
-    physicsWorld,
+    physics,
     birdLayer,
     sheet,
     stores,
   });
 
-  const groundBody = physicsWorld.createBody({
-    type: 'static',
-    position: new Vec2(pxToM(GAME_WIDTH / 2), pxToM(GROUND_Y + GROUND_HEIGHT / 2)),
+  physics.createBody({
+    entityId: -1,
+    x: pxToM(GAME_WIDTH / 2),
+    y: pxToM(GROUND_Y + GROUND_HEIGHT / 2),
+    shape: {
+      kind: 'static-box',
+      halfWidth: pxToM(GAME_WIDTH / 2),
+      halfHeight: pxToM(GROUND_HEIGHT / 2),
+    },
+    userData: { type: 'ground', eid: -1 },
   });
-  groundBody.createFixture(new BoxShape(pxToM(GAME_WIDTH / 2), pxToM(GROUND_HEIGHT / 2)));
-  groundBody.setUserData({ type: 'ground' });
 
-  const ceilingBody = physicsWorld.createBody({
-    type: 'static',
-    position: new Vec2(pxToM(GAME_WIDTH / 2), pxToM(-12)),
+  physics.createBody({
+    entityId: -1,
+    x: pxToM(GAME_WIDTH / 2),
+    y: pxToM(-12),
+    shape: {
+      kind: 'static-box',
+      halfWidth: pxToM(GAME_WIDTH / 2),
+      halfHeight: pxToM(12),
+    },
+    userData: { type: 'ceiling', eid: -1 },
   });
-  ceilingBody.createFixture(new BoxShape(pxToM(GAME_WIDTH / 2), pxToM(12)));
-  ceilingBody.setUserData({ type: 'ceiling' });
 
   const birdQuery = query(ecsWorld, [BirdTag, Position, BodyRef]);
   const pipeQuery = query(ecsWorld, [PipeTag, Position, SpriteRef, BodyRef]);
@@ -206,7 +243,7 @@ import {
 
       spawnPipePair({
         ecsWorld,
-        physicsWorld,
+        physics,
         stores,
         pipesLayer,
         sheet,
@@ -221,21 +258,22 @@ import {
   const resetGame = (): void => {
     for (const pair of pipePairs) {
       if (entityExists(ecsWorld, pair.topEid)) {
-        destroyEntity(ecsWorld, physicsWorld, stores, pair.topEid);
+        destroyEntity(ecsWorld, physics, stores, pair.topEid);
       }
       if (entityExists(ecsWorld, pair.bottomEid)) {
-        destroyEntity(ecsWorld, physicsWorld, stores, pair.bottomEid);
+        destroyEntity(ecsWorld, physics, stores, pair.bottomEid);
       }
     }
     pipePairs.length = 0;
     pipeMap.length = 0;
     pipeMapProvider.reset();
 
-    birdBody.setTransform(new Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
-    birdBody.setLinearVelocity(new Vec2(0, 0));
-    birdBody.setAngularVelocity(0);
-    birdBody.setFixedRotation(true);
-    birdBody.setGravityScale(0);
+    physics.setTransform(birdBody.bodyId, pxToM(BIRD_X), pxToM(BIRD_START_Y), 0);
+    physics.setLinearVelocity(birdBody.bodyId, 0, 0);
+    physics.setAngularVelocity(birdBody.bodyId, 0);
+    physics.setFixedRotation(birdBody.bodyId, true);
+    physics.setGravityScale(birdBody.bodyId, 0);
+    physics.setAwake(birdBody.bodyId, true);
 
     Position.x[birdEid] = BIRD_X;
     Position.y[birdEid] = BIRD_START_Y;
@@ -263,19 +301,17 @@ import {
     }
     if (!runtime.started) {
       runtime.started = true;
-      birdBody.setGravityScale(1);
+      physics.setGravityScale(birdBody.bodyId, 1);
       hintText.visible = false;
       playSound(GAME_SFX.swoosh);
     }
-    birdBody.setLinearVelocity(new Vec2(0, -7.2));
+    physics.setLinearVelocity(birdBody.bodyId, 0, -7.2);
     playSound(GAME_SFX.flap);
   };
 
-  physicsWorld.on('begin-contact', (contact: Contact) => {
-    const bodyA = contact.getFixtureA().getBody();
-    const bodyB = contact.getFixtureB().getBody();
-    const dataA = bodyA.getUserData() as { type?: string } | undefined;
-    const dataB = bodyB.getUserData() as { type?: string } | undefined;
+  physics.onContact((event: PhysicsContactEvent) => {
+    const dataA = event.userDataA;
+    const dataB = event.userDataB;
 
     const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
     const hitGround = dataA?.type === 'ground' || dataB?.type === 'ground';
@@ -289,8 +325,8 @@ import {
 
     if (hitBird && hitPipeGroundOrCeiling && !runtime.gameOver) {
       runtime.gameOver = true;
-      birdBody.setFixedRotation(false);
-      birdBody.setAngularVelocity(6);
+      physics.setFixedRotation(birdBody.bodyId, false);
+      physics.setAngularVelocity(birdBody.bodyId, 6);
       gameOverSprite.visible = true;
       hintText.text = 'Click or press Space to restart';
       hintText.visible = true;
@@ -302,11 +338,11 @@ import {
 
     if (runtime.gameOver && hitBird && hitGround && !birdLandedAfterCrash) {
       birdLandedAfterCrash = true;
-      birdBody.setLinearVelocity(new Vec2(0, 0));
-      birdBody.setAngularVelocity(0);
-      birdBody.setGravityScale(0);
-      birdBody.setFixedRotation(true);
-      birdBody.setAwake(false);
+      physics.setLinearVelocity(birdBody.bodyId, 0, 0);
+      physics.setAngularVelocity(birdBody.bodyId, 0);
+      physics.setGravityScale(birdBody.bodyId, 0);
+      physics.setFixedRotation(birdBody.bodyId, true);
+      physics.setAwake(birdBody.bodyId, false);
     }
   });
 
@@ -335,8 +371,8 @@ import {
     }
 
     if (runtime.started) {
-      physicsWorld.step(dt);
-      syncBirdFromPhysics({ birdQuery, stores });
+      physics.step(dt);
+      syncBirdFromPhysics({ birdQuery, physics });
     }
 
     if (!runtime.gameOver) {
@@ -347,7 +383,7 @@ import {
         dt,
         speed: currentSpeed,
         ecsWorld,
-        physicsWorld,
+        physics,
         stores,
         pipeQuery,
         pipePairs,
@@ -365,7 +401,7 @@ import {
         setBirdPose(runtime.flapFrame);
       }
 
-      const vy = birdBody.getLinearVelocity().y;
+      const vy = physics.shared.velocityY[birdBody.bodyId];
       birdSprite.rotation = Math.max(-0.6, Math.min(1.2, vy * 0.08));
     } else if (!birdLandedAfterCrash) {
       birdSprite.rotation = Math.min(1.45, birdSprite.rotation + dt * 5);

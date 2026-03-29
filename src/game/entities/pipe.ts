@@ -2,16 +2,15 @@ import { Container, Sprite } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { addComponent, addEntity } from 'bitecs';
 import type { World as EcsWorld } from 'bitecs';
-import { BoxShape, Vec2 } from 'planck';
-import type { World as PlanckWorld } from 'planck';
 
 import { pxToM } from '../config/constants';
 import { BodyRef, PipeTag, Position, SpriteRef } from '../ecs/components';
 import type { EntityStores, PipePair } from '../ecs/types';
+import type { PhysicsAdapter } from '../physics';
 
 type CreatePipeSegmentParams = {
   ecsWorld: EcsWorld;
-  physicsWorld: PlanckWorld;
+  physics: PhysicsAdapter;
   stores: EntityStores;
   pipesLayer: Container;
   sheet: Spritesheet;
@@ -22,7 +21,7 @@ type CreatePipeSegmentParams = {
 
 const createPipeSegment = ({
   ecsWorld,
-  physicsWorld,
+  physics,
   stores,
   pipesLayer,
   sheet,
@@ -47,21 +46,25 @@ const createPipeSegment = ({
   SpriteRef.id[eid] = eid;
   stores.sprites[eid] = sprite;
 
-  const body = physicsWorld.createBody({
-    type: 'static',
-    position: new Vec2(pxToM(x), pxToM(y)),
+  const body = physics.createBody({
+    entityId: eid,
+    x: pxToM(x),
+    y: pxToM(y),
+    shape: {
+      kind: 'static-box',
+      halfWidth: pxToM(26),
+      halfHeight: pxToM(160),
+    },
+    userData: { type: 'pipe', eid },
   });
-  body.createFixture(new BoxShape(pxToM(26), pxToM(160)));
-  body.setUserData({ type: 'pipe', eid });
-  BodyRef.id[eid] = eid;
-  stores.bodies[eid] = body;
+  BodyRef.id[eid] = body.bodyId;
 
   return eid;
 };
 
 type SpawnPipePairParams = {
   ecsWorld: EcsWorld;
-  physicsWorld: PlanckWorld;
+  physics: PhysicsAdapter;
   stores: EntityStores;
   pipesLayer: Container;
   sheet: Spritesheet;
@@ -73,7 +76,7 @@ type SpawnPipePairParams = {
 
 export const spawnPipePair = ({
   ecsWorld,
-  physicsWorld,
+  physics,
   stores,
   pipesLayer,
   sheet,
@@ -87,7 +90,7 @@ export const spawnPipePair = ({
 
   const topEid = createPipeSegment({
     ecsWorld,
-    physicsWorld,
+    physics,
     stores,
     pipesLayer,
     sheet,
@@ -98,7 +101,7 @@ export const spawnPipePair = ({
 
   const bottomEid = createPipeSegment({
     ecsWorld,
-    physicsWorld,
+    physics,
     stores,
     pipesLayer,
     sheet,
