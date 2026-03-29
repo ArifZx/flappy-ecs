@@ -23,6 +23,7 @@ body {
   height: 100dvh;
   display: grid;
   place-items: center;
+  position: relative;
 }
 
 #app canvas {
@@ -32,6 +33,46 @@ body {
   border-radius: 12px;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.24);
   image-rendering: auto;
+}
+
+.game-over-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.game-over-actions[hidden] {
+  display: none;
+}
+
+.game-over-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(24, 24, 24, 0.88);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.restart-button {
+  background: rgba(46, 46, 46, 0.92);
+  color: #f0f0f0;
+}
+
+.share-button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.share-buffer-image {
+  display: none;
 }
 
 @media (orientation: portrait) {
