@@ -45,7 +45,7 @@ import {
   await app.init({
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
-    backgroundColor: 0x70c5ce,
+    backgroundColor: 'black',
     antialias: true,
   });
 
@@ -112,7 +112,7 @@ import {
     },
   });
   hintText.anchor.set(0.5, 0.5);
-  hintText.position.set(GAME_WIDTH / 2, GAME_HEIGHT * 0.28);
+  hintText.position.set(GAME_WIDTH / 2, GAME_HEIGHT * 0.2);
   scene.addChild(hintText);
 
   const gameOverSprite = new Sprite(sheet.textures.gameover);
@@ -276,7 +276,7 @@ import {
     if (hitBird && hitPipeGroundOrCeiling && !runtime.gameOver) {
       runtime.gameOver = true;
       gameOverSprite.visible = true;
-      hintText.text = 'Klik / Space untuk ulang';
+      hintText.text = 'Click or press Space to restart';
       hintText.visible = true;
     }
   });
