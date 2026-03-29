@@ -5,12 +5,14 @@ import type { Spritesheet } from 'pixi.js';
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config/constants';
 import { preloadSounds } from './game/audio/sound';
 import { MAX_ENTITIES } from './game/ecs/components';
+import { createShareButton } from './game/app/create-share-button';
 import {
   createPhysicsBackend,
   type PhysicsBackendName,
 } from './game/app/create-physics-backend';
 import { createGameRuntime } from './game/app/create-game-runtime';
 import { createGameScene } from './game/app/create-scene';
+import type { GamePhase } from './game/ecs/resources';
 
 const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
 
@@ -29,6 +31,10 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
   } else {
     document.body.appendChild(app.canvas);
   }
+
+  const shareButton = createShareButton({
+    parent: appRoot ?? document.body,
+  });
 
   const atlasTexture = await Assets.load('sprites/game.png');
   Assets.add({
@@ -59,6 +65,20 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
     scene,
     sheet,
   });
+  let lastPhase: GamePhase | null = null;
+
+  const captureDeathScreenshot = async (): Promise<void> => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+
+    const screenshotImage = await app.renderer.extract.image({
+      target: app.stage,
+      format: 'png',
+    });
+
+    shareButton.setScreenshotSrc(screenshotImage.currentSrc || screenshotImage.src || null);
+  };
 
   app.canvas.addEventListener('pointerdown', runtime.flap);
   window.addEventListener('keydown', (event) => {
@@ -71,5 +91,18 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
   app.ticker.add(() => {
     const dt = Math.min(app.ticker.deltaMS / 1000, 1 / 30);
     runtime.update(dt);
+
+    const phase = runtime.getPhase();
+    if (phase !== lastPhase) {
+      shareButton.setVisible(phase === 'game-over');
+      if (phase !== 'game-over') {
+        shareButton.setScreenshotSrc(null);
+      }
+      lastPhase = phase;
+    }
+
+    if (runtime.consumeScreenshotRequest()) {
+      void captureDeathScreenshot();
+    }
   });
 })();

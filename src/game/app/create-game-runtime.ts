@@ -6,7 +6,7 @@ import {
   pxToM,
 } from '../config/constants';
 import { GAME_SFX, flushSoundQueue, playSound } from '../audio/sound';
-import { createGameRuntimeResource } from '../ecs/resources';
+import { createGameRuntimeResource, type GamePhase } from '../ecs/resources';
 import { Position } from '../ecs/components';
 import type { PhysicsAdapter, PhysicsContactEvent } from '../physics';
 import { getPipeSpeedByScore, isNightByScore } from '../systems/difficulty';
@@ -27,6 +27,8 @@ type CreateGameRuntimeParams = {
 export type GameRuntimeController = {
   flap: () => void;
   update: (dt: number) => void;
+  getPhase: () => GamePhase;
+  consumeScreenshotRequest: () => boolean;
 };
 
 export const createGameRuntime = ({
@@ -49,6 +51,7 @@ export const createGameRuntime = ({
 
   const runtime = createGameRuntimeResource();
   let birdLandedAfterCrash = false;
+  let screenshotRequested = false;
 
   const setBirdPose = (idx: number): void => {
     birdSprite.texture = birdFrames[idx % birdFrames.length];
@@ -68,13 +71,13 @@ export const createGameRuntime = ({
     Position.y[birdEid] = BIRD_START_Y;
     birdSprite.rotation = 0;
 
+    runtime.phase = 'idle';
     runtime.score = 0;
-    runtime.started = false;
-    runtime.gameOver = false;
     runtime.flapFrame = 0;
     runtime.flapTimer = 0;
     runtime.bobTimer = 0;
     birdLandedAfterCrash = false;
+    screenshotRequested = false;
 
     scene.scoreText.text = '0';
     scene.hintText.text = 'Click or press Space to flap';
@@ -98,8 +101,9 @@ export const createGameRuntime = ({
       dataA?.type === 'ceiling' ||
       dataB?.type === 'ceiling';
 
-    if (hitBird && hitPipeGroundOrCeiling && !runtime.gameOver) {
-      runtime.gameOver = true;
+    if (hitBird && hitPipeGroundOrCeiling && runtime.phase !== 'game-over') {
+      runtime.phase = 'game-over';
+      screenshotRequested = true;
       physics.setFixedRotation(birdBody.bodyId, false);
       physics.setAngularVelocity(birdBody.bodyId, 6);
       scene.gameOverSprite.visible = true;
@@ -112,7 +116,7 @@ export const createGameRuntime = ({
       playSound(GAME_SFX.die);
     }
 
-    if (runtime.gameOver && hitBird && hitGround && !birdLandedAfterCrash) {
+    if (runtime.phase === 'game-over' && hitBird && hitGround && !birdLandedAfterCrash) {
       birdLandedAfterCrash = true;
       physics.setLinearVelocity(birdBody.bodyId, 0, 0);
       physics.setAngularVelocity(birdBody.bodyId, 0);
@@ -125,14 +129,14 @@ export const createGameRuntime = ({
   physics.onContact(handleContact);
 
   const flap = (): void => {
-    if (runtime.gameOver) {
+    if (runtime.phase === 'game-over') {
       resetGame();
       playSound(GAME_SFX.swoosh);
       return;
     }
 
-    if (!runtime.started) {
-      runtime.started = true;
+    if (runtime.phase === 'idle') {
+      runtime.phase = 'playing';
       physics.setGravityScale(birdBody.bodyId, 1);
       scene.hintText.visible = false;
       playSound(GAME_SFX.swoosh);
@@ -148,19 +152,19 @@ export const createGameRuntime = ({
 
     flushSoundQueue();
 
-    if (!runtime.started && !runtime.gameOver) {
+    if (runtime.phase === 'idle') {
       runtime.bobTimer += dt;
       Position.y[birdEid] = BIRD_START_Y + Math.sin(runtime.bobTimer * 5) * 6;
       syncSpritesFromPosition({ renderQuery: context.renderQuery, stores: context.stores });
       return;
     }
 
-    if (runtime.started) {
+    if (runtime.phase !== 'idle') {
       physics.step(dt);
       syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
     }
 
-    if (!runtime.gameOver) {
+    if (runtime.phase === 'playing') {
       const currentSpeed = getPipeSpeedByScore(runtime.score);
       const scoreDelta = pipeDirector.update(dt, currentSpeed, runtime.score);
 
@@ -183,7 +187,7 @@ export const createGameRuntime = ({
       birdSprite.rotation = Math.min(1.45, birdSprite.rotation + dt * 5);
     }
 
-    if (!runtime.gameOver) {
+    if (runtime.phase === 'playing') {
       const scroll = getPipeSpeedByScore(runtime.score) * dt;
       scene.groundA.x -= scroll;
       scene.groundB.x -= scroll;
@@ -202,5 +206,11 @@ export const createGameRuntime = ({
   return {
     flap,
     update,
+    getPhase: () => runtime.phase,
+    consumeScreenshotRequest: () => {
+      const requested = screenshotRequested;
+      screenshotRequested = false;
+      return requested;
+    },
   };
 };
