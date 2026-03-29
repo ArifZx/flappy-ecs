@@ -27,17 +27,19 @@ src/
 
 ## High-Level Runtime Flow
 
-The main entry point is intentionally thin now. It creates the Pixi app, loads assets, creates the scene, selects the physics backend, creates the gameplay runtime controller, and then forwards input and ticker updates to that controller.
+The main entry point is intentionally thin now. It creates the Pixi app, loads assets, remembers the poster logo source for share-image export, creates the scene, selects the physics backend, creates the gameplay runtime controller, wires game-over DOM actions, and then forwards input and ticker updates to that controller.
 
 ```mermaid
 flowchart TD
     A[App start] --> B[Load textures and audio]
-  B --> C[Create scene]
-  C --> D[Choose physics backend]
-  D --> E[Create runtime controller]
-  E --> F[Register input handlers]
-  F --> G[Start ticker loop]
-  G --> H[runtime.update dt]
+  B --> C[Remember poster logo source]
+  C --> D[Create scene]
+  D --> E[Choose physics backend]
+  E --> F[Create runtime controller]
+  F --> G[Create game-over DOM actions]
+  G --> H[Register input handlers]
+  H --> I[Start ticker loop]
+  I --> J[runtime.update dt]
 ```
 
 ## App Layer
@@ -50,9 +52,28 @@ The `game/app` folder now acts as the composition layer between bootstrap code a
 - `create-physics-backend.ts`: selects worker or main-thread physics
 - `create-runtime-context.ts`: creates ECS world, stores, queries, bird, and static bounds
 - `create-pipe-director.ts`: owns pipe spawning, deterministic pipe map, movement, and cleanup
-- `create-game-runtime.ts`: coordinates round state, input, collision outcomes, and frame updates
+- `create-game-runtime.ts`: coordinates round state, input, score flow, and frame updates
+- `create-bird-crash-controller.ts`: isolates collision resolution and bird crash transitions
+- `create-game-over-actions.ts`: creates restart and share DOM controls for the game-over phase
+- `create-share-image-capture.ts`: builds the exported share image with gameplay crop, score, QR, and logo
 
 This split keeps `main.ts` small while avoiding over-engineering.
+
+## Explicit Game Phases
+
+The round flow now uses an explicit phase model stored in the runtime resource object:
+
+- `idle`
+- `playing`
+- `game-over`
+
+This keeps input rules and UI visibility simpler:
+
+- `idle`: the bird bobs in place and waits for the first flap
+- `playing`: gravity, pipes, scoring, and collision outcomes are active
+- `game-over`: physics finishes the crash/landing flow, share capture is requested once, and restart is only available through the dedicated button
+
+This phase model replaced the earlier boolean-style flow such as separate `started` and `gameOver` checks.
 
 ## ECS Flow
 
@@ -187,6 +208,14 @@ During gameplay:
 3. physics steps
 4. ECS `Position` is refreshed from the physics snapshot
 5. render system moves the sprite to the ECS position
+
+During game-over:
+
+1. contact callback switches the runtime phase to `game-over`
+2. the bird is allowed to rotate and fall until it lands
+3. a one-shot screenshot request flag is emitted
+4. the main thread captures a share image and enables the share action
+5. restart is handled by a DOM button instead of flap input
 
 ### Bird flow diagram
 
@@ -376,12 +405,62 @@ At the moment:
 - scene creation is isolated from gameplay runtime.
 - runtime context creation is isolated from frame update logic.
 - pipe lifecycle is isolated behind a pipe director.
+- game-over actions are isolated behind a small DOM helper.
+- share-image export is isolated behind a dedicated capture/composition helper.
 - The game loop is already wired to the physics adapter.
 - Bird and pipe entity factories create bodies through the adapter.
 - Render sync reads position from adapter shared state instead of direct Planck objects.
 - Collision callbacks also come through the adapter.
 
 This means the game logic is no longer tightly coupled to `planck.World`, and the bootstrap file is no longer responsible for all gameplay decisions.
+
+## Game-Over Actions
+
+The game-over interaction is intentionally split away from the Pixi scene and uses DOM controls instead.
+
+### Current behavior
+
+- `Restart` and `Share` buttons are rendered in a DOM overlay.
+- The button group is hidden during `idle` and `playing`.
+- The button group becomes visible only during `game-over`.
+- Restart no longer happens via tap or space while the game is over.
+
+This avoids accidental restart taps on the canvas and keeps share/download behavior separate from gameplay input.
+
+## Share Image Export Flow
+
+The share image is not just a raw canvas dump anymore. It is composed intentionally for game-over sharing.
+
+### What gets exported
+
+- a cropped gameplay image from the visible viewport
+- the current score rendered as a custom badge
+- a QR card pointing to `window.location.href`
+- the LCP poster logo in the lower-left corner
+
+### What is excluded
+
+- in-game hint text
+- in-game game-over banner
+- the normal score HUD text
+
+### Export flow
+
+```mermaid
+flowchart TD
+  A[Bird enters game-over] --> B[Runtime emits screenshot request]
+  B --> C[Main thread waits one frame]
+  C --> D[Temporarily hide HUD and banner]
+  D --> E[Extract viewport canvas]
+  E --> F[Compose share image]
+  F --> G[Draw score badge]
+  G --> H[Draw QR card]
+  H --> I[Draw poster logo]
+  I --> J[Store image in hidden img buffer]
+  J --> K[Enable Share button]
+```
+
+The hidden `img` buffer is important because the download action uses a stable stored image, not a fresh WebGL canvas capture at click time.
 
 ## Requirements for SAB Worker Physics
 
@@ -655,18 +734,17 @@ Without this, debugging behavior changes can take longer than necessary.
 
 ## Recommended Improvements for This Project
 
-If you want the highest return on effort, these are the next structural improvements I would prioritize.
+If you want the highest return on effort from the current state, these are the next structural improvements I would prioritize.
 
-1. Split `main.ts` into bootstrap, round controller, and frame orchestration helpers.
-2. Add an explicit phase model instead of relying only on booleans.
-3. Add a small debug overlay for backend, phase, bird velocity, and SAB compatibility.
-4. Introduce a network-facing adapter layer similar to the physics adapter.
-5. Split collision resolution and bird state transitions out of `create-game-runtime.ts` if gameplay expands.
-6. Formalize which runtime state belongs in ECS, which belongs in services, and which belongs in room or network state.
+1. Add a small debug overlay for backend, phase, bird velocity, and SAB compatibility.
+2. Formalize which runtime state belongs in ECS, which belongs in services, and which belongs in room or network state.
+3. Introduce a network-facing adapter layer similar to the physics adapter.
+4. Consider moving game-over DOM action styling and composition into a more explicit UI module if more menu states are added.
+5. Consider extracting score and round-reset flow from `create-game-runtime.ts` if more game modes are added.
 
 ## Recommended Next Steps
 
-1. Add a tiny debug overlay showing the active physics backend (`worker` or `main-thread`).
-2. Split game state into explicit phases such as `idle`, `playing`, and `game-over`.
-3. Extract collision resolution into a small dedicated helper or module.
-4. Introduce a network adapter above the physics adapter for multiplayer commands and snapshots.
+1. Add a tiny debug overlay showing the active physics backend (`worker` or `main-thread`) and current phase.
+2. Introduce a network adapter above the physics adapter for multiplayer commands and snapshots.
+3. Decide whether future share-export layouts should remain canvas-composited or move to a template-based export pipeline.
+4. Decide whether score flow should stay inside the runtime controller or move into a dedicated round-state helper.

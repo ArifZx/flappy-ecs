@@ -8,12 +8,13 @@ import {
 import { GAME_SFX, flushSoundQueue, playSound } from '../audio/sound';
 import { createGameRuntimeResource, type GamePhase } from '../ecs/resources';
 import { Position } from '../ecs/components';
-import type { PhysicsAdapter, PhysicsContactEvent } from '../physics';
+import type { PhysicsAdapter } from '../physics';
 import { getPipeSpeedByScore, isNightByScore } from '../systems/difficulty';
 import {
   syncBirdFromPhysics,
   syncSpritesFromPosition,
 } from '../systems/render-system';
+import { createBirdCrashController } from './create-bird-crash-controller';
 import { createPipeDirector } from './create-pipe-director';
 import type { GameScene } from './create-scene';
 import { createRuntimeContext } from './create-runtime-context';
@@ -52,8 +53,13 @@ export const createGameRuntime = ({
   });
 
   const runtime = createGameRuntimeResource();
-  let birdLandedAfterCrash = false;
-  let screenshotRequested = false;
+  const birdCrashController = createBirdCrashController({
+    physics,
+    scene,
+    runtime,
+    birdBodyId: birdBody.bodyId,
+    birdSprite,
+  });
 
   const setBirdPose = (idx: number): void => {
     birdSprite.texture = birdFrames[idx % birdFrames.length];
@@ -78,8 +84,7 @@ export const createGameRuntime = ({
     runtime.flapFrame = 0;
     runtime.flapTimer = 0;
     runtime.bobTimer = 0;
-    birdLandedAfterCrash = false;
-    screenshotRequested = false;
+    birdCrashController.reset();
 
     scene.scoreText.text = '0';
     scene.hintText.text = 'Click or press Space to flap';
@@ -89,45 +94,7 @@ export const createGameRuntime = ({
     setBirdPose(1);
   };
 
-  const handleContact = (event: PhysicsContactEvent): void => {
-    const dataA = event.userDataA;
-    const dataB = event.userDataB;
-
-    const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
-    const hitGround = dataA?.type === 'ground' || dataB?.type === 'ground';
-    const hitPipe = dataA?.type === 'pipe' || dataB?.type === 'pipe';
-    const hitPipeGroundOrCeiling =
-      hitPipe ||
-      dataA?.type === 'ground' ||
-      dataB?.type === 'ground' ||
-      dataA?.type === 'ceiling' ||
-      dataB?.type === 'ceiling';
-
-    if (hitBird && hitPipeGroundOrCeiling && runtime.phase !== 'game-over') {
-      runtime.phase = 'game-over';
-      screenshotRequested = true;
-      physics.setFixedRotation(birdBody.bodyId, false);
-      physics.setAngularVelocity(birdBody.bodyId, 6);
-      scene.gameOverSprite.visible = true;
-      scene.hintText.visible = false;
-
-      if (hitPipe) {
-        playSound(GAME_SFX.hit);
-      }
-      playSound(GAME_SFX.die);
-    }
-
-    if (runtime.phase === 'game-over' && hitBird && hitGround && !birdLandedAfterCrash) {
-      birdLandedAfterCrash = true;
-      physics.setLinearVelocity(birdBody.bodyId, 0, 0);
-      physics.setAngularVelocity(birdBody.bodyId, 0);
-      physics.setGravityScale(birdBody.bodyId, 0);
-      physics.setFixedRotation(birdBody.bodyId, true);
-      physics.setAwake(birdBody.bodyId, false);
-    }
-  };
-
-  physics.onContact(handleContact);
+  physics.onContact(birdCrashController.handleContact);
 
   const restart = (): void => {
     resetGame();
@@ -187,8 +154,8 @@ export const createGameRuntime = ({
 
       const velocityY = physics.shared.velocityY[birdBody.bodyId];
       birdSprite.rotation = Math.max(-0.6, Math.min(1.2, velocityY * 0.08));
-    } else if (!birdLandedAfterCrash) {
-      birdSprite.rotation = Math.min(1.45, birdSprite.rotation + dt * 5);
+    } else {
+      birdCrashController.update(dt);
     }
 
     if (runtime.phase === 'playing') {
@@ -213,10 +180,6 @@ export const createGameRuntime = ({
     update,
     getPhase: () => runtime.phase,
     getScore: () => runtime.score,
-    consumeScreenshotRequest: () => {
-      const requested = screenshotRequested;
-      screenshotRequested = false;
-      return requested;
-    },
+    consumeScreenshotRequest: birdCrashController.consumeScreenshotRequest,
   };
 };
