@@ -175,11 +175,17 @@ const captureViewportCanvas = (app: Application, scene: GameScene): HTMLCanvasEl
   scene.gameOverSprite.visible = false;
 
   try {
-    return app.renderer.extract.canvas({
+    const extractedCanvas = app.renderer.extract.canvas({
       target: scene.container,
       frame: new Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT),
       resolution: 1,
     });
+
+    if (!(extractedCanvas instanceof HTMLCanvasElement)) {
+      throw new Error('Share image capture requires an HTMLCanvasElement renderer target.');
+    }
+
+    return extractedCanvas;
   } finally {
     scene.scoreText.visible = previousScoreVisible;
     scene.hintText.visible = previousHintVisible;

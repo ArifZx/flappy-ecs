@@ -1,7 +1,7 @@
 import { createWorld, query } from 'bitecs';
 import type { Spritesheet } from 'pixi.js';
 
-import { BIRD_START_Y, GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, pxToM } from '../config/constants';
+import { GAME_WIDTH, GROUND_HEIGHT, GROUND_Y, pxToM } from '../config/constants';
 import {
   BirdTag,
   BodyRef,
