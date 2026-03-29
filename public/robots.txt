@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://flappy.arifz.com/sitemap.xml

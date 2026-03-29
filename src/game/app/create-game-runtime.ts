@@ -130,10 +130,8 @@ export const createGameRuntime = ({
       return;
     }
 
-    if (runtime.phase !== 'idle') {
-      physics.step(dt);
-      syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
-    }
+    physics.step(dt);
+    syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
 
     if (runtime.phase === 'playing') {
       const currentSpeed = getPipeSpeedByScore(runtime.score);
