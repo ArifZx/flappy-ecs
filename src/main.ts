@@ -139,6 +139,13 @@ import {
   groundBody.createFixture(planck.Box(pxToM(GAME_WIDTH / 2), pxToM(GROUND_HEIGHT / 2)));
   groundBody.setUserData({ type: 'ground' });
 
+  const ceilingBody = physicsWorld.createBody({
+    type: 'static',
+    position: planck.Vec2(pxToM(GAME_WIDTH / 2), pxToM(-12)),
+  });
+  ceilingBody.createFixture(planck.Box(pxToM(GAME_WIDTH / 2), pxToM(12)));
+  ceilingBody.setUserData({ type: 'ceiling' });
+
   const birdQuery = ecs.query(ecsWorld, [BirdTag, Position, BodyRef]);
   const pipeQuery = ecs.query(ecsWorld, [PipeTag, Position, SpriteRef, BodyRef]);
   const renderQuery = ecs.query(ecsWorld, [Position, SpriteRef]);
@@ -207,13 +214,15 @@ import {
     const dataB = bodyB.getUserData() as { type?: string } | undefined;
 
     const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
-    const hitPipeOrGround =
+    const hitPipeGroundOrCeiling =
       dataA?.type === 'pipe' ||
       dataB?.type === 'pipe' ||
       dataA?.type === 'ground' ||
-      dataB?.type === 'ground';
+      dataB?.type === 'ground' ||
+      dataA?.type === 'ceiling' ||
+      dataB?.type === 'ceiling';
 
-    if (hitBird && hitPipeOrGround && !gameOver) {
+    if (hitBird && hitPipeGroundOrCeiling && !gameOver) {
       gameOver = true;
       gameOverSprite.visible = true;
       hintText.text = 'Klik / Space untuk ulang';
