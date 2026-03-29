@@ -1,0 +1,21 @@
+{
+  "name": "flappy",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^8.0.1"
+  },
+  "dependencies": {
+    "@pixi/sound": "^6.0.1",
+    "bitecs": "^0.4.0",
+    "pixi.js": "^8.17.1",
+    "planck": "^1.4.3"
+  }
+}
