@@ -13,8 +13,9 @@ This document explains the current game flow at a high level and describes how p
 
 ```text
 src/
-  main.ts                  # App bootstrap and game loop orchestration
+  main.ts                  # Thin bootstrap only
   game/
+    app/                   # Bootstrap helpers and runtime composition
     audio/                 # Sound service and SFX helpers
     config/                # Constants and configuration
     ecs/                   # ECS components, shared runtime state, lifecycle helpers
@@ -26,26 +27,32 @@ src/
 
 ## High-Level Runtime Flow
 
-The main entry point creates the app, loads assets, selects a physics backend, creates entities, and then runs the frame loop.
+The main entry point is intentionally thin now. It creates the Pixi app, loads assets, creates the scene, selects the physics backend, creates the gameplay runtime controller, and then forwards input and ticker updates to that controller.
 
 ```mermaid
 flowchart TD
     A[App start] --> B[Load textures and audio]
-    B --> C[Create ECS world]
-    C --> D[Choose physics backend]
-    D --> E[Create bird, pipes, background, UI]
-    E --> F[Register input handlers]
-    F --> G[Start ticker loop]
-
-    G --> H[Update background and audio queue]
-    H --> I{Game started?}
-    I -- No --> J[Idle bob animation]
-    I -- Yes --> K[Step physics adapter]
-    K --> L[Sync ECS position from physics]
-    L --> M[Spawn and move pipes]
-    M --> N[Update score and bird animation]
-    N --> O[Sync sprites from ECS position]
+  B --> C[Create scene]
+  C --> D[Choose physics backend]
+  D --> E[Create runtime controller]
+  E --> F[Register input handlers]
+  F --> G[Start ticker loop]
+  G --> H[runtime.update dt]
 ```
+
+## App Layer
+
+The `game/app` folder now acts as the composition layer between bootstrap code and gameplay systems.
+
+### Main responsibilities
+
+- `create-scene.ts`: creates Pixi containers and HUD objects
+- `create-physics-backend.ts`: selects worker or main-thread physics
+- `create-runtime-context.ts`: creates ECS world, stores, queries, bird, and static bounds
+- `create-pipe-director.ts`: owns pipe spawning, deterministic pipe map, movement, and cleanup
+- `create-game-runtime.ts`: coordinates round state, input, collision outcomes, and frame updates
+
+This split keeps `main.ts` small while avoiding over-engineering.
 
 ## ECS Flow
 
@@ -65,6 +72,18 @@ The ECS layer stores game state that is useful to rendering and gameplay systems
 - ECS owns logical entity membership and render-facing component data.
 - The physics adapter owns collision shapes, dynamic body simulation, and contact events.
 - Pixi owns actual display objects.
+
+```mermaid
+flowchart LR
+  A[Input] --> B[Game runtime controller]
+  B --> C[ECS components]
+  B --> D[Physics adapter commands]
+  D --> E[Physics backend]
+  E --> F[Shared state snapshot]
+  F --> C
+  C --> G[Render systems]
+  G --> H[Pixi sprites]
+```
 
 ## How Bird and Pipe Use ECS
 
@@ -237,18 +256,6 @@ flowchart LR
   E --> J[Off-screen cleanup]
 ```
 
-```mermaid
-flowchart LR
-    A[Input] --> B[Game logic]
-    B --> C[ECS components]
-    B --> D[Physics adapter commands]
-    D --> E[Physics backend]
-    E --> F[Shared state snapshot]
-    F --> C
-    C --> G[Render systems]
-    G --> H[Pixi sprites]
-```
-
 ## Physics Adapter Design
 
 The physics layer is intentionally hidden behind a backend-agnostic interface.
@@ -365,12 +372,16 @@ sequenceDiagram
 
 At the moment:
 
+- `main.ts` is only a bootstrap and wiring entry point.
+- scene creation is isolated from gameplay runtime.
+- runtime context creation is isolated from frame update logic.
+- pipe lifecycle is isolated behind a pipe director.
 - The game loop is already wired to the physics adapter.
 - Bird and pipe entity factories create bodies through the adapter.
 - Render sync reads position from adapter shared state instead of direct Planck objects.
 - Collision callbacks also come through the adapter.
 
-This means the game logic is no longer tightly coupled to `planck.World` in `main.ts`.
+This means the game logic is no longer tightly coupled to `planck.World`, and the bootstrap file is no longer responsible for all gameplay decisions.
 
 ## Requirements for SAB Worker Physics
 
@@ -489,7 +500,7 @@ Both are better than letting each client invent obstacle positions independently
 
 `main.ts` should coordinate systems, not absorb all logic forever.
 
-As the project grows, move these concerns into dedicated systems or services:
+This project is already moving in the right direction with the `game/app` layer. As the project grows further, move these concerns into dedicated systems or services:
 
 - game phase transitions
 - score handling
@@ -550,19 +561,18 @@ This scales better than many systems directly mutating low-level state in unrela
 
 The project is in a good direction, but there are a few pain points worth naming explicitly.
 
-### 1. Main orchestration is still dense
+### 1. Runtime controller still owns several concerns
 
-`main.ts` still coordinates a lot of responsibilities at once:
+The refactor improved things a lot, but `create-game-runtime.ts` still coordinates several responsibilities:
 
-- app bootstrap
-- entity creation
-- UI setup
-- game state transitions
-- audio triggers
-- contact handling
-- ticker loop orchestration
+- round reset flow
+- flap flow
+- collision outcomes
+- animation timing
+- score updates
+- frame orchestration
 
-This is normal early on, but it will become the biggest maintenance hotspot if not split further.
+That is acceptable for this project size, but it is now the next likely hotspot if the game grows.
 
 ### 2. ECS state and non-ECS runtime state are still mixed
 
@@ -651,12 +661,12 @@ If you want the highest return on effort, these are the next structural improvem
 2. Add an explicit phase model instead of relying only on booleans.
 3. Add a small debug overlay for backend, phase, bird velocity, and SAB compatibility.
 4. Introduce a network-facing adapter layer similar to the physics adapter.
-5. Create a dedicated collision resolution module instead of growing one callback.
+5. Split collision resolution and bird state transitions out of `create-game-runtime.ts` if gameplay expands.
 6. Formalize which runtime state belongs in ECS, which belongs in services, and which belongs in room or network state.
 
 ## Recommended Next Steps
 
 1. Add a tiny debug overlay showing the active physics backend (`worker` or `main-thread`).
-2. Add a dedicated physics sync system for angle and velocity-driven animation.
-3. Split game state into explicit phases such as `idle`, `playing`, and `game-over`.
+2. Split game state into explicit phases such as `idle`, `playing`, and `game-over`.
+3. Extract collision resolution into a small dedicated helper or module.
 4. Introduce a network adapter above the physics adapter for multiplayer commands and snapshots.
