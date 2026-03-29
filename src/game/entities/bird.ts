@@ -2,7 +2,7 @@ import { Container, Sprite } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { addComponent, addEntity } from 'bitecs';
 import type { World as EcsWorld } from 'bitecs';
-import { Circle, Vec2 } from 'planck';
+import { CircleShape, Vec2 } from 'planck';
 import type { Body, World as PlanckWorld } from 'planck';
 
 import { BIRD_START_Y, BIRD_X, pxToM } from '../config/constants';
@@ -62,11 +62,11 @@ export const createBirdEntity = ({
   stores.sprites[birdEid] = birdSprite;
 
   const birdBody = physicsWorld.createDynamicBody({
-    position: Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)),
+    position: new Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)),
     fixedRotation: true,
     linearDamping: 0,
   });
-  birdBody.createFixture(Circle(pxToM(11)), {
+  birdBody.createFixture(new CircleShape(pxToM(11)), {
     density: 1,
     friction: 0,
     restitution: 0,

@@ -3,7 +3,7 @@ import './style.css';
 import { Application, Assets, Container, Sprite, Text } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { createWorld, entityExists, query } from 'bitecs';
-import { Box, Vec2, World } from 'planck';
+import { BoxShape, Vec2, World } from 'planck';
 import type { Contact } from 'planck';
 import {
   GAME_WIDTH,
@@ -118,7 +118,7 @@ import {
   scene.addChild(gameOverSprite);
 
   const ecsWorld = createWorld();
-  const physicsWorld = World(Vec2(0, 24));
+  const physicsWorld = new World(new Vec2(0, 24));
 
   const stores: EntityStores = {
     sprites: new Array(MAX_ENTITIES).fill(null),
@@ -135,16 +135,16 @@ import {
 
   const groundBody = physicsWorld.createBody({
     type: 'static',
-    position: Vec2(pxToM(GAME_WIDTH / 2), pxToM(GROUND_Y + GROUND_HEIGHT / 2)),
+    position: new Vec2(pxToM(GAME_WIDTH / 2), pxToM(GROUND_Y + GROUND_HEIGHT / 2)),
   });
-  groundBody.createFixture(Box(pxToM(GAME_WIDTH / 2), pxToM(GROUND_HEIGHT / 2)));
+  groundBody.createFixture(new BoxShape(pxToM(GAME_WIDTH / 2), pxToM(GROUND_HEIGHT / 2)));
   groundBody.setUserData({ type: 'ground' });
 
   const ceilingBody = physicsWorld.createBody({
     type: 'static',
-    position: Vec2(pxToM(GAME_WIDTH / 2), pxToM(-12)),
+    position: new Vec2(pxToM(GAME_WIDTH / 2), pxToM(-12)),
   });
-  ceilingBody.createFixture(Box(pxToM(GAME_WIDTH / 2), pxToM(12)));
+  ceilingBody.createFixture(new BoxShape(pxToM(GAME_WIDTH / 2), pxToM(12)));
   ceilingBody.setUserData({ type: 'ceiling' });
 
   const birdQuery = query(ecsWorld, [BirdTag, Position, BodyRef]);
@@ -176,8 +176,8 @@ import {
     }
     pipePairs.length = 0;
 
-    birdBody.setTransform(Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
-    birdBody.setLinearVelocity(Vec2(0, 0));
+    birdBody.setTransform(new Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
+    birdBody.setLinearVelocity(new Vec2(0, 0));
     birdBody.setAngularVelocity(0);
     birdBody.setGravityScale(0);
 
@@ -205,7 +205,7 @@ import {
       birdBody.setGravityScale(1);
       hintText.visible = false;
     }
-    birdBody.setLinearVelocity(Vec2(0, -7.2));
+    birdBody.setLinearVelocity(new Vec2(0, -7.2));
   };
 
   physicsWorld.on('begin-contact', (contact: Contact) => {

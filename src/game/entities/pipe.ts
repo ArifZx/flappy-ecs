@@ -2,7 +2,7 @@ import { Container, Sprite } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { addComponent, addEntity } from 'bitecs';
 import type { World as EcsWorld } from 'bitecs';
-import { Box, Vec2 } from 'planck';
+import { BoxShape, Vec2 } from 'planck';
 import type { World as PlanckWorld } from 'planck';
 
 import { GAME_WIDTH, GROUND_Y, PIPE_GAP, pxToM } from '../config/constants';
@@ -49,9 +49,9 @@ const createPipeSegment = ({
 
   const body = physicsWorld.createBody({
     type: 'static',
-    position: Vec2(pxToM(x), pxToM(y)),
+    position: new Vec2(pxToM(x), pxToM(y)),
   });
-  body.createFixture(Box(pxToM(26), pxToM(160)));
+  body.createFixture(new BoxShape(pxToM(26), pxToM(160)));
   body.setUserData({ type: 'pipe', eid });
   BodyRef.id[eid] = eid;
   stores.bodies[eid] = body;

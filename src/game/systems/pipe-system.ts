@@ -31,7 +31,7 @@ export const moveAndCleanupPipes = ({
 
     const body = stores.bodies[BodyRef.id[eid]];
     if (body) {
-      body.setTransform(Vec2(pxToM(Position.x[eid]), pxToM(Position.y[eid])), 0);
+      body.setTransform(new Vec2(pxToM(Position.x[eid]), pxToM(Position.y[eid])), 0);
     }
   }
 
