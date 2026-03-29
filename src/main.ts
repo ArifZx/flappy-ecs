@@ -39,6 +39,12 @@ import {
   syncBirdFromPhysics,
   syncSpritesFromPosition,
 } from './game/systems/render-system';
+import {
+  GAME_SFX,
+  flushSoundQueue,
+  playSound,
+  preloadSounds,
+} from './game/audio/sound';
 
 (async () => {
   const app = new Application();
@@ -63,6 +69,7 @@ import {
     data: { texture: atlasTexture },
   });
   const sheet = await Assets.load<Spritesheet>('game-atlas');
+  await preloadSounds();
 
   const lcpPoster = document.getElementById('lcp-poster');
   if (lcpPoster) {
@@ -251,14 +258,17 @@ import {
   const flap = (): void => {
     if (runtime.gameOver) {
       resetGame();
+      playSound(GAME_SFX.swoosh);
       return;
     }
     if (!runtime.started) {
       runtime.started = true;
       birdBody.setGravityScale(1);
       hintText.visible = false;
+      playSound(GAME_SFX.swoosh);
     }
     birdBody.setLinearVelocity(new Vec2(0, -7.2));
+    playSound(GAME_SFX.flap);
   };
 
   physicsWorld.on('begin-contact', (contact: Contact) => {
@@ -284,12 +294,14 @@ import {
       gameOverSprite.visible = true;
       hintText.text = 'Click or press Space to restart';
       hintText.visible = true;
+      playSound(GAME_SFX.hit);
     }
 
     if (runtime.gameOver && hitBird && hitGround && !birdLandedAfterCrash) {
       birdLandedAfterCrash = true;
       birdBody.setAngularVelocity(0);
       birdBody.setFixedRotation(true);
+      playSound(GAME_SFX.die);
     }
   });
 
@@ -307,6 +319,8 @@ import {
     const isNightBand = isNightByScore(runtime.score);
     background.setNightTarget(isNightBand);
     background.update(dt);
+
+    flushSoundQueue();
 
     if (!runtime.started && !runtime.gameOver) {
       runtime.bobTimer += dt;
@@ -336,6 +350,7 @@ import {
       if (scoreDelta > 0) {
         runtime.score += scoreDelta;
         scoreText.text = String(runtime.score);
+        playSound(GAME_SFX.point);
       }
 
       runtime.flapTimer += dt;
