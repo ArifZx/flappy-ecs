@@ -279,9 +279,9 @@ import {
 
     const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
     const hitGround = dataA?.type === 'ground' || dataB?.type === 'ground';
+    const hitPipe = dataA?.type === 'pipe' || dataB?.type === 'pipe';
     const hitPipeGroundOrCeiling =
-      dataA?.type === 'pipe' ||
-      dataB?.type === 'pipe' ||
+      hitPipe ||
       dataA?.type === 'ground' ||
       dataB?.type === 'ground' ||
       dataA?.type === 'ceiling' ||
@@ -294,14 +294,19 @@ import {
       gameOverSprite.visible = true;
       hintText.text = 'Click or press Space to restart';
       hintText.visible = true;
-      playSound(GAME_SFX.hit);
+      if (hitPipe) {
+        playSound(GAME_SFX.hit);
+      }
+      playSound(GAME_SFX.die);
     }
 
     if (runtime.gameOver && hitBird && hitGround && !birdLandedAfterCrash) {
       birdLandedAfterCrash = true;
+      birdBody.setLinearVelocity(new Vec2(0, 0));
       birdBody.setAngularVelocity(0);
+      birdBody.setGravityScale(0);
       birdBody.setFixedRotation(true);
-      playSound(GAME_SFX.die);
+      birdBody.setAwake(false);
     }
   });
 
