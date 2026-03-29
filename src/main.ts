@@ -59,6 +59,11 @@ import {
   });
   const sheet = await Assets.load<Spritesheet>('game-atlas');
 
+  const lcpPoster = document.getElementById('lcp-poster');
+  if (lcpPoster) {
+    lcpPoster.remove();
+  }
+
   const scene = new Container();
   app.stage.addChild(scene);
 

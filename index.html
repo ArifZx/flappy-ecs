@@ -4,9 +4,38 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preload" as="image" href="/logo.webp" fetchpriority="high" />
+    <style>
+      #lcp-poster {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      #lcp-poster img {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(42vw, 220px);
+        height: auto;
+        max-height: 30vh;
+        object-fit: contain;
+      }
+
+      #app {
+        position: relative;
+        z-index: 1;
+      }
+    </style>
     <title>flappy</title>
   </head>
   <body>
+    <picture id="lcp-poster" aria-hidden="true">
+      <source srcset="/logo.webp" type="image/webp" />
+      <img src="/logo.png" alt="" fetchpriority="high" decoding="async" />
+    </picture>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
