@@ -1,57 +1,18 @@
 import './style.css';
 
-import { Application, Assets, Container, Sprite, Text } from 'pixi.js';
+import { Application, Assets } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
-import { createWorld, entityExists, query } from 'bitecs';
+import { GAME_HEIGHT, GAME_WIDTH } from './game/config/constants';
+import { preloadSounds } from './game/audio/sound';
+import { MAX_ENTITIES } from './game/ecs/components';
 import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
-  GROUND_HEIGHT,
-  GROUND_Y,
-  BIRD_START_Y,
-  pxToM,
-  BIRD_X,
-} from './game/config/constants';
-import { createBackground } from './game/ui/background';
+  createPhysicsBackend,
+  type PhysicsBackendName,
+} from './game/app/create-physics-backend';
+import { createGameRuntime } from './game/app/create-game-runtime';
+import { createGameScene } from './game/app/create-scene';
 
-import {
-  MAX_ENTITIES,
-  Position,
-  SpriteRef,
-  BodyRef,
-  BirdTag,
-  PipeTag,
-} from './game/ecs/components';
-import type { EntityStores, PipePair } from './game/ecs/types';
-import { createGameRuntimeResource } from './game/ecs/resources';
-import { destroyEntity } from './game/ecs/entity-lifecycle';
-import { createBirdEntity } from './game/entities/bird';
-import { spawnPipePair } from './game/entities/pipe';
-import {
-  MainThreadPhysicsAdapter,
-  WorkerPhysicsAdapter,
-  canUseSharedArrayBufferPhysics,
-  type PhysicsAdapter,
-  type PhysicsContactEvent,
-} from './game/physics';
-import {
-  createPipeMapProvider,
-  type PipeMapEntry,
-} from './game/systems/pipe-map';
-import { moveAndCleanupPipes } from './game/systems/pipe-system';
-import { getPipeSpeedByScore, isNightByScore } from './game/systems/difficulty';
-import {
-  syncBirdFromPhysics,
-  syncSpritesFromPosition,
-} from './game/systems/render-system';
-import {
-  GAME_SFX,
-  flushSoundQueue,
-  playSound,
-  preloadSounds,
-} from './game/audio/sound';
-
-const PHYSICS_BACKEND: 'main-thread' | 'worker' = 'worker';
+const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
 
 (async () => {
   const app = new Application();
@@ -83,342 +44,32 @@ const PHYSICS_BACKEND: 'main-thread' | 'worker' = 'worker';
     lcpPoster.remove();
   }
 
-  const scene = new Container();
-  app.stage.addChild(scene);
+  const scene = createGameScene(sheet);
+  app.stage.addChild(scene.container);
 
-  const background = createBackground(sheet, GAME_WIDTH, GAME_HEIGHT);
-  scene.addChild(background.container);
-
-  const pipesLayer = new Container();
-  scene.addChild(pipesLayer);
-
-  const birdLayer = new Container();
-  scene.addChild(birdLayer);
-
-  const groundA = new Sprite(sheet.textures.base);
-  const groundB = new Sprite(sheet.textures.base);
-  groundA.anchor.set(0, 0);
-  groundB.anchor.set(0, 0);
-  groundA.position.set(0, GROUND_Y);
-  groundB.position.set(groundA.width, GROUND_Y);
-  scene.addChild(groundA, groundB);
-
-  const scoreText = new Text({
-    text: '0',
-    style: {
-      fontFamily: 'Arial',
-      fontSize: 36,
-      fill: 0xffffff,
-      stroke: { color: 0x000000, width: 4 },
-    },
+  const { physics, backend } = await createPhysicsBackend({
+    preferredBackend: PHYSICS_BACKEND,
+    capacity: MAX_ENTITIES,
+    gravity: { x: 0, y: 24 },
   });
-  scoreText.anchor.set(0.5, 0);
-  scoreText.position.set(GAME_WIDTH / 2, 16);
-  scene.addChild(scoreText);
+  console.log(`Using physics backend: ${backend}`);
 
-  const hintText = new Text({
-    text: 'Click or press Space to flap',
-    style: {
-      fontFamily: 'Arial',
-      fontSize: 16,
-      fill: 0xffffff,
-      stroke: { color: 0x000000, width: 3 },
-    },
-  });
-  hintText.anchor.set(0.5, 0.5);
-  hintText.position.set(GAME_WIDTH / 2, GAME_HEIGHT * 0.2);
-  scene.addChild(hintText);
-
-  const gameOverSprite = new Sprite(sheet.textures.gameover);
-  gameOverSprite.anchor.set(0.5);
-  gameOverSprite.position.set(GAME_WIDTH / 2, GAME_HEIGHT * 0.32);
-  gameOverSprite.visible = false;
-  scene.addChild(gameOverSprite);
-
-  const ecsWorld = createWorld();
-  const useWorkerPhysics =
-    PHYSICS_BACKEND === 'worker' && canUseSharedArrayBufferPhysics();
-
-  console.log(`Using physics backend: ${useWorkerPhysics ? 'worker' : 'main-thread'}`);
-
-  if (PHYSICS_BACKEND === 'worker' && !useWorkerPhysics) {
-    console.warn(
-      'Worker physics disabled: SharedArrayBuffer is unavailable or crossOriginIsolated is false. Falling back to main-thread physics.',
-    );
-  }
-
-  const physics: PhysicsAdapter =
-    useWorkerPhysics
-      ? new WorkerPhysicsAdapter({
-          capacity: MAX_ENTITIES,
-          gravity: { x: 0, y: 24 },
-        })
-      : new MainThreadPhysicsAdapter({
-          capacity: MAX_ENTITIES,
-          gravity: { x: 0, y: 24 },
-        });
-  await physics.init();
-
-  const stores: EntityStores = {
-    sprites: new Array(MAX_ENTITIES).fill(null),
-  };
-
-  const { birdEid, birdBody, birdSprite, birdFrames } = createBirdEntity({
-    ecsWorld,
+  const runtime = createGameRuntime({
     physics,
-    birdLayer,
+    scene,
     sheet,
-    stores,
   });
 
-  physics.createBody({
-    entityId: -1,
-    x: pxToM(GAME_WIDTH / 2),
-    y: pxToM(GROUND_Y + GROUND_HEIGHT / 2),
-    shape: {
-      kind: 'static-box',
-      halfWidth: pxToM(GAME_WIDTH / 2),
-      halfHeight: pxToM(GROUND_HEIGHT / 2),
-    },
-    userData: { type: 'ground', eid: -1 },
-  });
-
-  physics.createBody({
-    entityId: -1,
-    x: pxToM(GAME_WIDTH / 2),
-    y: pxToM(-12),
-    shape: {
-      kind: 'static-box',
-      halfWidth: pxToM(GAME_WIDTH / 2),
-      halfHeight: pxToM(12),
-    },
-    userData: { type: 'ceiling', eid: -1 },
-  });
-
-  const birdQuery = query(ecsWorld, [BirdTag, Position, BodyRef]);
-  const pipeQuery = query(ecsWorld, [PipeTag, Position, SpriteRef, BodyRef]);
-  const renderQuery = query(ecsWorld, [Position, SpriteRef]);
-
-  const pipePairs: PipePair[] = [];
-  const pipeMap: PipeMapEntry[] = [];
-  const pipeMapProvider = createPipeMapProvider({
-    seed: 0x24f1a5c3,
-    initialHeight: BIRD_START_Y,
-  });
-
-  const runtime = createGameRuntimeResource();
-  let birdLandedAfterCrash = false;
-
-  const setBirdPose = (idx: number): void => {
-    birdSprite.texture = birdFrames[idx % birdFrames.length];
-  };
-
-  const refillPipeMap = (): void => {
-    if (pipeMap.length >= 10) return;
-    const newEntries = pipeMapProvider.nextEntries(runtime.score, 12);
-    pipeMap.push(...newEntries);
-  };
-
-  const getRightMostPipeX = (): number | null => {
-    let maxX: number | null = null;
-    for (let i = 0; i < pipePairs.length; i += 1) {
-      const x = Position.x[pipePairs[i].topEid];
-      if (maxX === null || x > maxX) maxX = x;
-    }
-    return maxX;
-  };
-
-  const spawnPipesByMap = (): void => {
-    refillPipeMap();
-    const spawnLeadX = GAME_WIDTH + 120;
-
-    while (true) {
-      const rightMostX = getRightMostPipeX();
-      if (rightMostX !== null && rightMostX > spawnLeadX) break;
-
-      const next = pipeMap.shift();
-      if (!next) break;
-
-      const spawnX = rightMostX === null ? GAME_WIDTH + 40 : rightMostX + next.x;
-
-      spawnPipePair({
-        ecsWorld,
-        physics,
-        stores,
-        pipesLayer,
-        sheet,
-        pipePairs,
-        x: spawnX,
-        gap: next.gap,
-        height: next.height,
-      });
-    }
-  };
-
-  const resetGame = (): void => {
-    for (const pair of pipePairs) {
-      if (entityExists(ecsWorld, pair.topEid)) {
-        destroyEntity(ecsWorld, physics, stores, pair.topEid);
-      }
-      if (entityExists(ecsWorld, pair.bottomEid)) {
-        destroyEntity(ecsWorld, physics, stores, pair.bottomEid);
-      }
-    }
-    pipePairs.length = 0;
-    pipeMap.length = 0;
-    pipeMapProvider.reset();
-
-    physics.setTransform(birdBody.bodyId, pxToM(BIRD_X), pxToM(BIRD_START_Y), 0);
-    physics.setLinearVelocity(birdBody.bodyId, 0, 0);
-    physics.setAngularVelocity(birdBody.bodyId, 0);
-    physics.setFixedRotation(birdBody.bodyId, true);
-    physics.setGravityScale(birdBody.bodyId, 0);
-    physics.setAwake(birdBody.bodyId, true);
-
-    Position.x[birdEid] = BIRD_X;
-    Position.y[birdEid] = BIRD_START_Y;
-    birdSprite.rotation = 0;
-
-    runtime.score = 0;
-    scoreText.text = '0';
-    runtime.started = false;
-    runtime.gameOver = false;
-    runtime.flapFrame = 0;
-    runtime.flapTimer = 0;
-    runtime.bobTimer = 0;
-    birdLandedAfterCrash = false;
-    hintText.visible = true;
-    gameOverSprite.visible = false;
-    background.reset();
-    setBirdPose(1);
-  };
-
-  const flap = (): void => {
-    if (runtime.gameOver) {
-      resetGame();
-      playSound(GAME_SFX.swoosh);
-      return;
-    }
-    if (!runtime.started) {
-      runtime.started = true;
-      physics.setGravityScale(birdBody.bodyId, 1);
-      hintText.visible = false;
-      playSound(GAME_SFX.swoosh);
-    }
-    physics.setLinearVelocity(birdBody.bodyId, 0, -7.2);
-    playSound(GAME_SFX.flap);
-  };
-
-  physics.onContact((event: PhysicsContactEvent) => {
-    const dataA = event.userDataA;
-    const dataB = event.userDataB;
-
-    const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
-    const hitGround = dataA?.type === 'ground' || dataB?.type === 'ground';
-    const hitPipe = dataA?.type === 'pipe' || dataB?.type === 'pipe';
-    const hitPipeGroundOrCeiling =
-      hitPipe ||
-      dataA?.type === 'ground' ||
-      dataB?.type === 'ground' ||
-      dataA?.type === 'ceiling' ||
-      dataB?.type === 'ceiling';
-
-    if (hitBird && hitPipeGroundOrCeiling && !runtime.gameOver) {
-      runtime.gameOver = true;
-      physics.setFixedRotation(birdBody.bodyId, false);
-      physics.setAngularVelocity(birdBody.bodyId, 6);
-      gameOverSprite.visible = true;
-      hintText.text = 'Click or press Space to restart';
-      hintText.visible = true;
-      if (hitPipe) {
-        playSound(GAME_SFX.hit);
-      }
-      playSound(GAME_SFX.die);
-    }
-
-    if (runtime.gameOver && hitBird && hitGround && !birdLandedAfterCrash) {
-      birdLandedAfterCrash = true;
-      physics.setLinearVelocity(birdBody.bodyId, 0, 0);
-      physics.setAngularVelocity(birdBody.bodyId, 0);
-      physics.setGravityScale(birdBody.bodyId, 0);
-      physics.setFixedRotation(birdBody.bodyId, true);
-      physics.setAwake(birdBody.bodyId, false);
-    }
-  });
-
-  app.canvas.addEventListener('pointerdown', flap);
+  app.canvas.addEventListener('pointerdown', runtime.flap);
   window.addEventListener('keydown', (event) => {
     if (event.code === 'Space' || event.code === 'ArrowUp') {
       event.preventDefault();
-      flap();
+      runtime.flap();
     }
   });
 
   app.ticker.add(() => {
     const dt = Math.min(app.ticker.deltaMS / 1000, 1 / 30);
-
-    const isNightBand = isNightByScore(runtime.score);
-    background.setNightTarget(isNightBand);
-    background.update(dt);
-
-    flushSoundQueue();
-
-    if (!runtime.started && !runtime.gameOver) {
-      runtime.bobTimer += dt;
-      Position.y[birdEid] = BIRD_START_Y + Math.sin(runtime.bobTimer * 5) * 6;
-      syncSpritesFromPosition({ renderQuery, stores });
-      return;
-    }
-
-    if (runtime.started) {
-      physics.step(dt);
-      syncBirdFromPhysics({ birdQuery, physics });
-    }
-
-    if (!runtime.gameOver) {
-      const currentSpeed = getPipeSpeedByScore(runtime.score);
-      spawnPipesByMap();
-
-      const scoreDelta = moveAndCleanupPipes({
-        dt,
-        speed: currentSpeed,
-        ecsWorld,
-        physics,
-        stores,
-        pipeQuery,
-        pipePairs,
-      });
-      if (scoreDelta > 0) {
-        runtime.score += scoreDelta;
-        scoreText.text = String(runtime.score);
-        playSound(GAME_SFX.point);
-      }
-
-      runtime.flapTimer += dt;
-      if (runtime.flapTimer >= 0.12) {
-        runtime.flapTimer = 0;
-        runtime.flapFrame = (runtime.flapFrame + 1) % birdFrames.length;
-        setBirdPose(runtime.flapFrame);
-      }
-
-      const vy = physics.shared.velocityY[birdBody.bodyId];
-      birdSprite.rotation = Math.max(-0.6, Math.min(1.2, vy * 0.08));
-    } else if (!birdLandedAfterCrash) {
-      birdSprite.rotation = Math.min(1.45, birdSprite.rotation + dt * 5);
-    }
-
-    if (!runtime.gameOver) {
-      const scroll = getPipeSpeedByScore(runtime.score) * dt;
-      groundA.x -= scroll;
-      groundB.x -= scroll;
-      if (groundA.x + groundA.width <= 0) {
-        groundA.x = groundB.x + groundB.width;
-      }
-      if (groundB.x + groundB.width <= 0) {
-        groundB.x = groundA.x + groundA.width;
-      }
-    }
-
-    syncSpritesFromPosition({ renderQuery, stores });
+    runtime.update(dt);
   });
 })();
