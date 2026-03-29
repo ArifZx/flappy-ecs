@@ -10,8 +10,6 @@ import {
   GAME_HEIGHT,
   GROUND_HEIGHT,
   GROUND_Y,
-  PIPE_SPEED,
-  PIPE_SPAWN_INTERVAL,
   BIRD_START_Y,
   pxToM,
   BIRD_X,
@@ -27,10 +25,16 @@ import {
   PipeTag,
 } from './game/ecs/components';
 import type { EntityStores, PipePair } from './game/ecs/types';
+import { createGameRuntimeResource } from './game/ecs/resources';
 import { destroyEntity } from './game/ecs/entity-lifecycle';
 import { createBirdEntity } from './game/entities/bird';
 import { spawnPipePair } from './game/entities/pipe';
+import {
+  createPipeMapProvider,
+  type PipeMapEntry,
+} from './game/systems/pipe-map';
 import { moveAndCleanupPipes } from './game/systems/pipe-system';
+import { getPipeSpeedByScore } from './game/systems/difficulty';
 import {
   syncBirdFromPhysics,
   syncSpritesFromPosition,
@@ -152,17 +156,58 @@ import {
   const renderQuery = query(ecsWorld, [Position, SpriteRef]);
 
   const pipePairs: PipePair[] = [];
+  const pipeMap: PipeMapEntry[] = [];
+  const pipeMapProvider = createPipeMapProvider({
+    seed: 0x24f1a5c3,
+    initialHeight: BIRD_START_Y,
+  });
 
-  let spawnTimer = 0;
-  let score = 0;
-  let started = false;
-  let gameOver = false;
-  let flapFrame = 0;
-  let flapTimer = 0;
-  let bobTimer = 0;
+  const runtime = createGameRuntimeResource();
 
   const setBirdPose = (idx: number): void => {
     birdSprite.texture = birdFrames[idx % birdFrames.length];
+  };
+
+  const refillPipeMap = (): void => {
+    if (pipeMap.length >= 10) return;
+    const newEntries = pipeMapProvider.nextEntries(runtime.score, 12);
+    pipeMap.push(...newEntries);
+  };
+
+  const getRightMostPipeX = (): number | null => {
+    let maxX: number | null = null;
+    for (let i = 0; i < pipePairs.length; i += 1) {
+      const x = Position.x[pipePairs[i].topEid];
+      if (maxX === null || x > maxX) maxX = x;
+    }
+    return maxX;
+  };
+
+  const spawnPipesByMap = (): void => {
+    refillPipeMap();
+    const spawnLeadX = GAME_WIDTH + 120;
+
+    while (true) {
+      const rightMostX = getRightMostPipeX();
+      if (rightMostX !== null && rightMostX > spawnLeadX) break;
+
+      const next = pipeMap.shift();
+      if (!next) break;
+
+      const spawnX = rightMostX === null ? GAME_WIDTH + 40 : rightMostX + next.x;
+
+      spawnPipePair({
+        ecsWorld,
+        physicsWorld,
+        stores,
+        pipesLayer,
+        sheet,
+        pipePairs,
+        x: spawnX,
+        gap: next.gap,
+        height: next.height,
+      });
+    }
   };
 
   const resetGame = (): void => {
@@ -175,6 +220,8 @@ import {
       }
     }
     pipePairs.length = 0;
+    pipeMap.length = 0;
+    pipeMapProvider.reset();
 
     birdBody.setTransform(new Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
     birdBody.setLinearVelocity(new Vec2(0, 0));
@@ -185,23 +232,25 @@ import {
     Position.y[birdEid] = BIRD_START_Y;
     birdSprite.rotation = 0;
 
-    score = 0;
+    runtime.score = 0;
     scoreText.text = '0';
-    spawnTimer = 0;
-    started = false;
-    gameOver = false;
+    runtime.started = false;
+    runtime.gameOver = false;
+    runtime.flapFrame = 0;
+    runtime.flapTimer = 0;
+    runtime.bobTimer = 0;
     hintText.visible = true;
     gameOverSprite.visible = false;
     setBirdPose(1);
   };
 
   const flap = (): void => {
-    if (gameOver) {
+    if (runtime.gameOver) {
       resetGame();
       return;
     }
-    if (!started) {
-      started = true;
+    if (!runtime.started) {
+      runtime.started = true;
       birdBody.setGravityScale(1);
       hintText.visible = false;
     }
@@ -223,8 +272,8 @@ import {
       dataA?.type === 'ceiling' ||
       dataB?.type === 'ceiling';
 
-    if (hitBird && hitPipeGroundOrCeiling && !gameOver) {
-      gameOver = true;
+    if (hitBird && hitPipeGroundOrCeiling && !runtime.gameOver) {
+      runtime.gameOver = true;
       gameOverSprite.visible = true;
       hintText.text = 'Klik / Space untuk ulang';
       hintText.visible = true;
@@ -242,31 +291,21 @@ import {
   app.ticker.add(() => {
     const dt = Math.min(app.ticker.deltaMS / 1000, 1 / 30);
 
-    if (!started && !gameOver) {
-      bobTimer += dt;
-      Position.y[birdEid] = BIRD_START_Y + Math.sin(bobTimer * 5) * 6;
+    if (!runtime.started && !runtime.gameOver) {
+      runtime.bobTimer += dt;
+      Position.y[birdEid] = BIRD_START_Y + Math.sin(runtime.bobTimer * 5) * 6;
       syncSpritesFromPosition({ renderQuery, stores });
       return;
     }
 
-    if (!gameOver) {
+    if (!runtime.gameOver) {
       physicsWorld.step(dt);
-      spawnTimer += dt;
-
-      if (spawnTimer >= PIPE_SPAWN_INTERVAL) {
-        spawnTimer -= PIPE_SPAWN_INTERVAL;
-        spawnPipePair({
-          ecsWorld,
-          physicsWorld,
-          stores,
-          pipesLayer,
-          sheet,
-          pipePairs,
-        });
-      }
+      const currentSpeed = getPipeSpeedByScore(runtime.score);
+      spawnPipesByMap();
 
       const scoreDelta = moveAndCleanupPipes({
         dt,
+        speed: currentSpeed,
         ecsWorld,
         physicsWorld,
         stores,
@@ -274,25 +313,25 @@ import {
         pipePairs,
       });
       if (scoreDelta > 0) {
-        score += scoreDelta;
-        scoreText.text = String(score);
+        runtime.score += scoreDelta;
+        scoreText.text = String(runtime.score);
       }
 
       syncBirdFromPhysics({ birdQuery, stores });
 
-      flapTimer += dt;
-      if (flapTimer >= 0.12) {
-        flapTimer = 0;
-        flapFrame = (flapFrame + 1) % birdFrames.length;
-        setBirdPose(flapFrame);
+      runtime.flapTimer += dt;
+      if (runtime.flapTimer >= 0.12) {
+        runtime.flapTimer = 0;
+        runtime.flapFrame = (runtime.flapFrame + 1) % birdFrames.length;
+        setBirdPose(runtime.flapFrame);
       }
 
       const vy = birdBody.getLinearVelocity().y;
       birdSprite.rotation = Math.max(-0.6, Math.min(1.2, vy * 0.08));
     }
 
-    if (!gameOver) {
-      const scroll = PIPE_SPEED * dt;
+    if (!runtime.gameOver) {
+      const scroll = getPipeSpeedByScore(runtime.score) * dt;
       groundA.x -= scroll;
       groundB.x -= scroll;
       if (groundA.x + groundA.width <= 0) {

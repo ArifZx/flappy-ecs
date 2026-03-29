@@ -5,7 +5,7 @@ import type { World as EcsWorld } from 'bitecs';
 import { BoxShape, Vec2 } from 'planck';
 import type { World as PlanckWorld } from 'planck';
 
-import { GAME_WIDTH, GROUND_Y, PIPE_GAP, pxToM } from '../config/constants';
+import { pxToM } from '../config/constants';
 import { BodyRef, PipeTag, Position, SpriteRef } from '../ecs/components';
 import type { EntityStores, PipePair } from '../ecs/types';
 
@@ -66,6 +66,9 @@ type SpawnPipePairParams = {
   pipesLayer: Container;
   sheet: Spritesheet;
   pipePairs: PipePair[];
+  x: number;
+  gap: number;
+  height: number;
 };
 
 export const spawnPipePair = ({
@@ -75,12 +78,12 @@ export const spawnPipePair = ({
   pipesLayer,
   sheet,
   pipePairs,
+  x,
+  gap,
+  height,
 }: SpawnPipePairParams): void => {
-  const x = GAME_WIDTH + 40;
-  const gapCenter = 120 + Math.random() * (GROUND_Y - 120 - 120);
-
-  const topCenterY = gapCenter - PIPE_GAP / 2 - 160;
-  const bottomCenterY = gapCenter + PIPE_GAP / 2 + 160;
+  const topCenterY = height - gap / 2 - 160;
+  const bottomCenterY = height + gap / 2 + 160;
 
   const topEid = createPipeSegment({
     ecsWorld,

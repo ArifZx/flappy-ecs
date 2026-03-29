@@ -3,13 +3,14 @@ import type { World as EcsWorld } from 'bitecs';
 import { Vec2 } from 'planck';
 import type { World as PlanckWorld } from 'planck';
 
-import { BIRD_X, PIPE_SPEED, pxToM } from '../config/constants';
+import { BIRD_X, pxToM } from '../config/constants';
 import { BodyRef, Position } from '../ecs/components';
 import { destroyEntity } from '../ecs/entity-lifecycle';
 import type { EcsQuery, EntityStores, PipePair } from '../ecs/types';
 
 type MoveAndCleanupPipesParams = {
   dt: number;
+  speed: number;
   ecsWorld: EcsWorld;
   physicsWorld: PlanckWorld;
   stores: EntityStores;
@@ -19,6 +20,7 @@ type MoveAndCleanupPipesParams = {
 
 export const moveAndCleanupPipes = ({
   dt,
+  speed,
   ecsWorld,
   physicsWorld,
   stores,
@@ -27,7 +29,7 @@ export const moveAndCleanupPipes = ({
 }: MoveAndCleanupPipesParams): number => {
   for (let i = 0; i < pipeQuery.length; i += 1) {
     const eid = pipeQuery[i];
-    Position.x[eid] -= PIPE_SPEED * dt;
+    Position.x[eid] -= speed * dt;
 
     const body = stores.bodies[BodyRef.id[eid]];
     if (body) {
