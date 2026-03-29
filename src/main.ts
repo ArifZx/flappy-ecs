@@ -5,8 +5,8 @@ import type { Spritesheet } from 'pixi.js';
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config/constants';
 import { preloadSounds } from './game/audio/sound';
 import { MAX_ENTITIES } from './game/ecs/components';
+import { createGameOverActions } from './game/app/create-game-over-actions';
 import { createShareImageCapture } from './game/app/create-share-image-capture';
-import { createShareButton } from './game/app/create-share-button';
 import {
   createPhysicsBackend,
   type PhysicsBackendName,
@@ -32,10 +32,6 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
   } else {
     document.body.appendChild(app.canvas);
   }
-
-  const shareButton = createShareButton({
-    parent: appRoot ?? document.body,
-  });
 
   const atlasTexture = await Assets.load('sprites/game.png');
   Assets.add({
@@ -68,6 +64,10 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
     scene,
     sheet,
   });
+  const gameOverActions = createGameOverActions({
+    parent: appRoot ?? document.body,
+    onRestart: runtime.restart,
+  });
   const captureShareImage = createShareImageCapture({
     app,
     scene,
@@ -91,16 +91,16 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
 
     const phase = runtime.getPhase();
     if (phase !== lastPhase) {
-      shareButton.setVisible(phase === 'game-over');
+      gameOverActions.setVisible(phase === 'game-over');
       if (phase !== 'game-over') {
-        shareButton.setScreenshotSrc(null);
+        gameOverActions.setScreenshotSrc(null);
       }
       lastPhase = phase;
     }
 
     if (runtime.consumeScreenshotRequest()) {
       void captureShareImage().then((imageSrc) => {
-        shareButton.setScreenshotSrc(imageSrc);
+        gameOverActions.setScreenshotSrc(imageSrc);
       });
     }
   });

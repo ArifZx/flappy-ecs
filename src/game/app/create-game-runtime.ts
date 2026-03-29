@@ -26,6 +26,7 @@ type CreateGameRuntimeParams = {
 
 export type GameRuntimeController = {
   flap: () => void;
+  restart: () => void;
   update: (dt: number) => void;
   getPhase: () => GamePhase;
   getScore: () => number;
@@ -108,8 +109,7 @@ export const createGameRuntime = ({
       physics.setFixedRotation(birdBody.bodyId, false);
       physics.setAngularVelocity(birdBody.bodyId, 6);
       scene.gameOverSprite.visible = true;
-      scene.hintText.text = 'Click or press Space to restart';
-      scene.hintText.visible = true;
+      scene.hintText.visible = false;
 
       if (hitPipe) {
         playSound(GAME_SFX.hit);
@@ -129,10 +129,13 @@ export const createGameRuntime = ({
 
   physics.onContact(handleContact);
 
+  const restart = (): void => {
+    resetGame();
+    playSound(GAME_SFX.swoosh);
+  };
+
   const flap = (): void => {
     if (runtime.phase === 'game-over') {
-      resetGame();
-      playSound(GAME_SFX.swoosh);
       return;
     }
 
@@ -206,6 +209,7 @@ export const createGameRuntime = ({
 
   return {
     flap,
+    restart,
     update,
     getPhase: () => runtime.phase,
     getScore: () => runtime.score,
