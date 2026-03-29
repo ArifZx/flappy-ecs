@@ -1,43 +1,22 @@
-import { createWorld, entityExists, query } from 'bitecs';
 import type { Spritesheet } from 'pixi.js';
 
 import {
   BIRD_START_Y,
   BIRD_X,
-  GAME_WIDTH,
-  GROUND_HEIGHT,
-  GROUND_Y,
   pxToM,
 } from '../config/constants';
 import { GAME_SFX, flushSoundQueue, playSound } from '../audio/sound';
 import { createGameRuntimeResource } from '../ecs/resources';
-import { destroyEntity } from '../ecs/entity-lifecycle';
-import type { EntityStores, PipePair } from '../ecs/types';
-import {
-  BirdTag,
-  BodyRef,
-  PipeTag,
-  Position,
-  SpriteRef,
-  MAX_ENTITIES,
-} from '../ecs/components';
-import { createBirdEntity } from '../entities/bird';
-import { spawnPipePair } from '../entities/pipe';
+import { Position } from '../ecs/components';
 import type { PhysicsAdapter, PhysicsContactEvent } from '../physics';
-import {
-  getPipeSpeedByScore,
-  isNightByScore,
-} from '../systems/difficulty';
-import {
-  createPipeMapProvider,
-  type PipeMapEntry,
-} from '../systems/pipe-map';
-import { moveAndCleanupPipes } from '../systems/pipe-system';
+import { getPipeSpeedByScore, isNightByScore } from '../systems/difficulty';
 import {
   syncBirdFromPhysics,
   syncSpritesFromPosition,
 } from '../systems/render-system';
+import { createPipeDirector } from './create-pipe-director';
 import type { GameScene } from './create-scene';
+import { createRuntimeContext } from './create-runtime-context';
 
 type CreateGameRuntimeParams = {
   physics: PhysicsAdapter;
@@ -55,52 +34,17 @@ export const createGameRuntime = ({
   scene,
   sheet,
 }: CreateGameRuntimeParams): GameRuntimeController => {
-  const ecsWorld = createWorld();
-  const stores: EntityStores = {
-    sprites: new Array(MAX_ENTITIES).fill(null),
-  };
-
-  const { birdEid, birdBody, birdSprite, birdFrames } = createBirdEntity({
-    ecsWorld,
+  const context = createRuntimeContext({
     physics,
-    birdLayer: scene.birdLayer,
+    scene,
     sheet,
-    stores,
   });
-
-  physics.createBody({
-    entityId: -1,
-    x: pxToM(GAME_WIDTH / 2),
-    y: pxToM(GROUND_Y + GROUND_HEIGHT / 2),
-    shape: {
-      kind: 'static-box',
-      halfWidth: pxToM(GAME_WIDTH / 2),
-      halfHeight: pxToM(GROUND_HEIGHT / 2),
-    },
-    userData: { type: 'ground', eid: -1 },
-  });
-
-  physics.createBody({
-    entityId: -1,
-    x: pxToM(GAME_WIDTH / 2),
-    y: pxToM(-12),
-    shape: {
-      kind: 'static-box',
-      halfWidth: pxToM(GAME_WIDTH / 2),
-      halfHeight: pxToM(12),
-    },
-    userData: { type: 'ceiling', eid: -1 },
-  });
-
-  const birdQuery = query(ecsWorld, [BirdTag, Position, BodyRef]);
-  const pipeQuery = query(ecsWorld, [PipeTag, Position, SpriteRef, BodyRef]);
-  const renderQuery = query(ecsWorld, [Position, SpriteRef]);
-
-  const pipePairs: PipePair[] = [];
-  const pipeMap: PipeMapEntry[] = [];
-  const pipeMapProvider = createPipeMapProvider({
-    seed: 0x24f1a5c3,
-    initialHeight: BIRD_START_Y,
+  const { birdEid, birdBody, birdSprite, birdFrames } = context.bird;
+  const pipeDirector = createPipeDirector({
+    context,
+    physics,
+    scene,
+    sheet,
   });
 
   const runtime = createGameRuntimeResource();
@@ -110,67 +54,8 @@ export const createGameRuntime = ({
     birdSprite.texture = birdFrames[idx % birdFrames.length];
   };
 
-  const refillPipeMap = (): void => {
-    if (pipeMap.length >= 10) return;
-    const newEntries = pipeMapProvider.nextEntries(runtime.score, 12);
-    pipeMap.push(...newEntries);
-  };
-
-  const getRightMostPipeX = (): number | null => {
-    let maxX: number | null = null;
-    for (let i = 0; i < pipePairs.length; i += 1) {
-      const x = Position.x[pipePairs[i].topEid];
-      if (maxX === null || x > maxX) {
-        maxX = x;
-      }
-    }
-    return maxX;
-  };
-
-  const spawnPipesByMap = (): void => {
-    refillPipeMap();
-    const spawnLeadX = GAME_WIDTH + 120;
-
-    while (true) {
-      const rightMostX = getRightMostPipeX();
-      if (rightMostX !== null && rightMostX > spawnLeadX) {
-        break;
-      }
-
-      const next = pipeMap.shift();
-      if (!next) {
-        break;
-      }
-
-      const spawnX = rightMostX === null ? GAME_WIDTH + 40 : rightMostX + next.x;
-
-      spawnPipePair({
-        ecsWorld,
-        physics,
-        stores,
-        pipesLayer: scene.pipesLayer,
-        sheet,
-        pipePairs,
-        x: spawnX,
-        gap: next.gap,
-        height: next.height,
-      });
-    }
-  };
-
   const resetGame = (): void => {
-    for (const pair of pipePairs) {
-      if (entityExists(ecsWorld, pair.topEid)) {
-        destroyEntity(ecsWorld, physics, stores, pair.topEid);
-      }
-      if (entityExists(ecsWorld, pair.bottomEid)) {
-        destroyEntity(ecsWorld, physics, stores, pair.bottomEid);
-      }
-    }
-
-    pipePairs.length = 0;
-    pipeMap.length = 0;
-    pipeMapProvider.reset();
+    pipeDirector.reset();
 
     physics.setTransform(birdBody.bodyId, pxToM(BIRD_X), pxToM(BIRD_START_Y), 0);
     physics.setLinearVelocity(birdBody.bodyId, 0, 0);
@@ -266,28 +151,18 @@ export const createGameRuntime = ({
     if (!runtime.started && !runtime.gameOver) {
       runtime.bobTimer += dt;
       Position.y[birdEid] = BIRD_START_Y + Math.sin(runtime.bobTimer * 5) * 6;
-      syncSpritesFromPosition({ renderQuery, stores });
+      syncSpritesFromPosition({ renderQuery: context.renderQuery, stores: context.stores });
       return;
     }
 
     if (runtime.started) {
       physics.step(dt);
-      syncBirdFromPhysics({ birdQuery, physics });
+      syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
     }
 
     if (!runtime.gameOver) {
       const currentSpeed = getPipeSpeedByScore(runtime.score);
-      spawnPipesByMap();
-
-      const scoreDelta = moveAndCleanupPipes({
-        dt,
-        speed: currentSpeed,
-        ecsWorld,
-        physics,
-        stores,
-        pipeQuery,
-        pipePairs,
-      });
+      const scoreDelta = pipeDirector.update(dt, currentSpeed, runtime.score);
 
       if (scoreDelta > 0) {
         runtime.score += scoreDelta;
@@ -321,7 +196,7 @@ export const createGameRuntime = ({
       }
     }
 
-    syncSpritesFromPosition({ renderQuery, stores });
+    syncSpritesFromPosition({ renderQuery: context.renderQuery, stores: context.stores });
   };
 
   return {
