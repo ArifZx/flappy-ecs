@@ -34,7 +34,7 @@ import {
   type PipeMapEntry,
 } from './game/systems/pipe-map';
 import { moveAndCleanupPipes } from './game/systems/pipe-system';
-import { getPipeSpeedByScore } from './game/systems/difficulty';
+import { getPipeSpeedByScore, isNightByScore } from './game/systems/difficulty';
 import {
   syncBirdFromPhysics,
   syncSpritesFromPosition,
@@ -73,7 +73,7 @@ import {
   app.stage.addChild(scene);
 
   const background = createBackground(sheet, GAME_WIDTH, GAME_HEIGHT);
-  scene.addChild(background);
+  scene.addChild(background.container);
 
   const pipesLayer = new Container();
   scene.addChild(pipesLayer);
@@ -103,7 +103,7 @@ import {
   scene.addChild(scoreText);
 
   const hintText = new Text({
-    text: 'Klik atau tekan Space untuk flap',
+    text: 'Click or press Space to flap',
     style: {
       fontFamily: 'Arial',
       fontSize: 16,
@@ -241,6 +241,7 @@ import {
     runtime.bobTimer = 0;
     hintText.visible = true;
     gameOverSprite.visible = false;
+    background.reset();
     setBirdPose(1);
   };
 
@@ -290,6 +291,10 @@ import {
 
   app.ticker.add(() => {
     const dt = Math.min(app.ticker.deltaMS / 1000, 1 / 30);
+
+    const isNightBand = isNightByScore(runtime.score);
+    background.setNightTarget(isNightBand);
+    background.update(dt);
 
     if (!runtime.started && !runtime.gameOver) {
       runtime.bobTimer += dt;

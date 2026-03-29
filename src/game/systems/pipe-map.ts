@@ -1,5 +1,5 @@
 import { GROUND_Y } from '../config/constants';
-import { getPipeGapByScore } from './difficulty';
+import { getGlobalDifficultyByScore, getPipeGapByScore } from './difficulty';
 
 export type PipeMapEntry = {
   id: number;
@@ -82,7 +82,7 @@ const generatePipeMapEntries = ({
   rng,
 }: GeneratePipeMapEntriesParams): PipeMapEntry[] => {
   const entries: PipeMapEntry[] = [];
-  const difficulty = 1 - Math.exp(-Math.max(0, score) / 16);
+  const difficulty = getGlobalDifficultyByScore(score);
 
   for (let i = 0; i < count; i += 1) {
     if (state.segmentRemaining <= 0) {
@@ -91,9 +91,11 @@ const generatePipeMapEntries = ({
     }
 
     if (state.closeBurstRemaining <= 0) {
-      const closeBurstChance = 0.14 + difficulty * 0.2;
+      const closeBurstChance = 0.08 + difficulty * 0.42;
       if (rng() < closeBurstChance) {
-        state.closeBurstRemaining = 2 + Math.floor(rng() * 2);
+        const minBurst = difficulty > 0.55 ? 3 : 2;
+        const extraBurst = difficulty > 0.8 ? 2 : 1;
+        state.closeBurstRemaining = minBurst + Math.floor(rng() * (extraBurst + 1));
       }
     }
 
