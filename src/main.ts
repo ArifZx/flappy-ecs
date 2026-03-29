@@ -2,8 +2,9 @@ import './style.css';
 
 import { Application, Assets, Container, Sprite, Text } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
-import * as ecs from 'bitecs';
-import * as planck from 'planck';
+import { createWorld, entityExists, query } from 'bitecs';
+import { Box, Vec2, World } from 'planck';
+import type { Contact } from 'planck';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -116,8 +117,8 @@ import {
   gameOverSprite.visible = false;
   scene.addChild(gameOverSprite);
 
-  const ecsWorld = ecs.createWorld();
-  const physicsWorld = planck.World(planck.Vec2(0, 24));
+  const ecsWorld = createWorld();
+  const physicsWorld = World(Vec2(0, 24));
 
   const stores: EntityStores = {
     sprites: new Array(MAX_ENTITIES).fill(null),
@@ -134,21 +135,21 @@ import {
 
   const groundBody = physicsWorld.createBody({
     type: 'static',
-    position: planck.Vec2(pxToM(GAME_WIDTH / 2), pxToM(GROUND_Y + GROUND_HEIGHT / 2)),
+    position: Vec2(pxToM(GAME_WIDTH / 2), pxToM(GROUND_Y + GROUND_HEIGHT / 2)),
   });
-  groundBody.createFixture(planck.Box(pxToM(GAME_WIDTH / 2), pxToM(GROUND_HEIGHT / 2)));
+  groundBody.createFixture(Box(pxToM(GAME_WIDTH / 2), pxToM(GROUND_HEIGHT / 2)));
   groundBody.setUserData({ type: 'ground' });
 
   const ceilingBody = physicsWorld.createBody({
     type: 'static',
-    position: planck.Vec2(pxToM(GAME_WIDTH / 2), pxToM(-12)),
+    position: Vec2(pxToM(GAME_WIDTH / 2), pxToM(-12)),
   });
-  ceilingBody.createFixture(planck.Box(pxToM(GAME_WIDTH / 2), pxToM(12)));
+  ceilingBody.createFixture(Box(pxToM(GAME_WIDTH / 2), pxToM(12)));
   ceilingBody.setUserData({ type: 'ceiling' });
 
-  const birdQuery = ecs.query(ecsWorld, [BirdTag, Position, BodyRef]);
-  const pipeQuery = ecs.query(ecsWorld, [PipeTag, Position, SpriteRef, BodyRef]);
-  const renderQuery = ecs.query(ecsWorld, [Position, SpriteRef]);
+  const birdQuery = query(ecsWorld, [BirdTag, Position, BodyRef]);
+  const pipeQuery = query(ecsWorld, [PipeTag, Position, SpriteRef, BodyRef]);
+  const renderQuery = query(ecsWorld, [Position, SpriteRef]);
 
   const pipePairs: PipePair[] = [];
 
@@ -166,17 +167,17 @@ import {
 
   const resetGame = (): void => {
     for (const pair of pipePairs) {
-      if (ecs.entityExists(ecsWorld, pair.topEid)) {
+      if (entityExists(ecsWorld, pair.topEid)) {
         destroyEntity(ecsWorld, physicsWorld, stores, pair.topEid);
       }
-      if (ecs.entityExists(ecsWorld, pair.bottomEid)) {
+      if (entityExists(ecsWorld, pair.bottomEid)) {
         destroyEntity(ecsWorld, physicsWorld, stores, pair.bottomEid);
       }
     }
     pipePairs.length = 0;
 
-    birdBody.setTransform(planck.Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
-    birdBody.setLinearVelocity(planck.Vec2(0, 0));
+    birdBody.setTransform(Vec2(pxToM(BIRD_X), pxToM(BIRD_START_Y)), 0);
+    birdBody.setLinearVelocity(Vec2(0, 0));
     birdBody.setAngularVelocity(0);
     birdBody.setGravityScale(0);
 
@@ -204,10 +205,10 @@ import {
       birdBody.setGravityScale(1);
       hintText.visible = false;
     }
-    birdBody.setLinearVelocity(planck.Vec2(0, -7.2));
+    birdBody.setLinearVelocity(Vec2(0, -7.2));
   };
 
-  physicsWorld.on('begin-contact', (contact: planck.Contact) => {
+  physicsWorld.on('begin-contact', (contact: Contact) => {
     const bodyA = contact.getFixtureA().getBody();
     const bodyB = contact.getFixtureB().getBody();
     const dataA = bodyA.getUserData() as { type?: string } | undefined;

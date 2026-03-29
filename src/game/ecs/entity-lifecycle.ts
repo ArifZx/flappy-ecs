@@ -1,12 +1,13 @@
-import * as ecs from 'bitecs';
-import * as planck from 'planck';
+import { removeEntity } from 'bitecs';
+import type { World as EcsWorld } from 'bitecs';
+import type { World as PlanckWorld } from 'planck';
 
 import { BodyRef, SpriteRef } from './components';
 import type { EntityStores } from './types';
 
 export const destroyEntity = (
-  ecsWorld: ReturnType<typeof ecs.createWorld>,
-  physicsWorld: planck.World,
+  ecsWorld: EcsWorld,
+  physicsWorld: PlanckWorld,
   stores: EntityStores,
   eid: number,
 ): void => {
@@ -25,5 +26,5 @@ export const destroyEntity = (
     stores.bodies[bodyId] = null;
   }
 
-  ecs.removeEntity(ecsWorld, eid);
+  removeEntity(ecsWorld, eid);
 };

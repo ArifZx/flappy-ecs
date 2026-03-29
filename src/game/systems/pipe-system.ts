@@ -1,5 +1,7 @@
-import * as ecs from 'bitecs';
-import * as planck from 'planck';
+import { entityExists } from 'bitecs';
+import type { World as EcsWorld } from 'bitecs';
+import { Vec2 } from 'planck';
+import type { World as PlanckWorld } from 'planck';
 
 import { BIRD_X, PIPE_SPEED, pxToM } from '../config/constants';
 import { BodyRef, Position } from '../ecs/components';
@@ -8,8 +10,8 @@ import type { EcsQuery, EntityStores, PipePair } from '../ecs/types';
 
 type MoveAndCleanupPipesParams = {
   dt: number;
-  ecsWorld: ReturnType<typeof ecs.createWorld>;
-  physicsWorld: planck.World;
+  ecsWorld: EcsWorld;
+  physicsWorld: PlanckWorld;
   stores: EntityStores;
   pipeQuery: EcsQuery;
   pipePairs: PipePair[];
@@ -29,7 +31,7 @@ export const moveAndCleanupPipes = ({
 
     const body = stores.bodies[BodyRef.id[eid]];
     if (body) {
-      body.setTransform(planck.Vec2(pxToM(Position.x[eid]), pxToM(Position.y[eid])), 0);
+      body.setTransform(Vec2(pxToM(Position.x[eid]), pxToM(Position.y[eid])), 0);
     }
   }
 
@@ -37,7 +39,7 @@ export const moveAndCleanupPipes = ({
 
   for (let i = pipePairs.length - 1; i >= 0; i -= 1) {
     const pair = pipePairs[i];
-    if (!ecs.entityExists(ecsWorld, pair.topEid)) {
+    if (!entityExists(ecsWorld, pair.topEid)) {
       pipePairs.splice(i, 1);
       continue;
     }
@@ -49,10 +51,10 @@ export const moveAndCleanupPipes = ({
     }
 
     if (pairX < -60) {
-      if (ecs.entityExists(ecsWorld, pair.topEid)) {
+      if (entityExists(ecsWorld, pair.topEid)) {
         destroyEntity(ecsWorld, physicsWorld, stores, pair.topEid);
       }
-      if (ecs.entityExists(ecsWorld, pair.bottomEid)) {
+      if (entityExists(ecsWorld, pair.bottomEid)) {
         destroyEntity(ecsWorld, physicsWorld, stores, pair.bottomEid);
       }
       pipePairs.splice(i, 1);

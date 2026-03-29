@@ -1,15 +1,17 @@
 import { Container, Sprite } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
-import * as ecs from 'bitecs';
-import * as planck from 'planck';
+import { addComponent, addEntity } from 'bitecs';
+import type { World as EcsWorld } from 'bitecs';
+import { Box, Vec2 } from 'planck';
+import type { World as PlanckWorld } from 'planck';
 
 import { GAME_WIDTH, GROUND_Y, PIPE_GAP, pxToM } from '../config/constants';
 import { BodyRef, PipeTag, Position, SpriteRef } from '../ecs/components';
 import type { EntityStores, PipePair } from '../ecs/types';
 
 type CreatePipeSegmentParams = {
-  ecsWorld: ReturnType<typeof ecs.createWorld>;
-  physicsWorld: planck.World;
+  ecsWorld: EcsWorld;
+  physicsWorld: PlanckWorld;
   stores: EntityStores;
   pipesLayer: Container;
   sheet: Spritesheet;
@@ -28,11 +30,11 @@ const createPipeSegment = ({
   y,
   flipY,
 }: CreatePipeSegmentParams): number => {
-  const eid = ecs.addEntity(ecsWorld);
-  ecs.addComponent(ecsWorld, eid, Position);
-  ecs.addComponent(ecsWorld, eid, SpriteRef);
-  ecs.addComponent(ecsWorld, eid, BodyRef);
-  ecs.addComponent(ecsWorld, eid, PipeTag);
+  const eid = addEntity(ecsWorld);
+  addComponent(ecsWorld, eid, Position);
+  addComponent(ecsWorld, eid, SpriteRef);
+  addComponent(ecsWorld, eid, BodyRef);
+  addComponent(ecsWorld, eid, PipeTag);
   PipeTag[eid] = 1;
 
   Position.x[eid] = x;
@@ -47,9 +49,9 @@ const createPipeSegment = ({
 
   const body = physicsWorld.createBody({
     type: 'static',
-    position: planck.Vec2(pxToM(x), pxToM(y)),
+    position: Vec2(pxToM(x), pxToM(y)),
   });
-  body.createFixture(planck.Box(pxToM(26), pxToM(160)));
+  body.createFixture(Box(pxToM(26), pxToM(160)));
   body.setUserData({ type: 'pipe', eid });
   BodyRef.id[eid] = eid;
   stores.bodies[eid] = body;
@@ -58,8 +60,8 @@ const createPipeSegment = ({
 };
 
 type SpawnPipePairParams = {
-  ecsWorld: ReturnType<typeof ecs.createWorld>;
-  physicsWorld: planck.World;
+  ecsWorld: EcsWorld;
+  physicsWorld: PlanckWorld;
   stores: EntityStores;
   pipesLayer: Container;
   sheet: Spritesheet;

@@ -1,5 +1,6 @@
 import { Sprite } from 'pixi.js';
-import * as planck from 'planck';
+import type { QueryResult } from 'bitecs';
+import type { Body } from 'planck';
 
 export type PipePair = {
   topEid: number;
@@ -9,7 +10,7 @@ export type PipePair = {
 
 export type EntityStores = {
   sprites: Array<Sprite | null>;
-  bodies: Array<planck.Body | null>;
+  bodies: Array<Body | null>;
 };
 
-export type EcsQuery = ArrayLike<number>;
+export type EcsQuery = QueryResult;
