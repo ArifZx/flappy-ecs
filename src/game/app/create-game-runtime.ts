@@ -9,7 +9,7 @@ import { GAME_SFX, flushSoundQueue, playSound } from '../audio/sound';
 import { createGameRuntimeResource, type GamePhase } from '../ecs/resources';
 import { Position } from '../ecs/components';
 import type { PhysicsAdapter } from '../physics';
-import { getPipeSpeedByScore, isNightByScore } from '../systems/difficulty';
+import { getPipeSpeedByMark, isNightByMark } from '../systems/difficulty';
 import {
   syncBirdFromPhysics,
   syncSpritesFromPosition,
@@ -30,7 +30,7 @@ export type GameRuntimeController = {
   restart: () => void;
   update: (dt: number) => void;
   getPhase: () => GamePhase;
-  getScore: () => number;
+  peek: () => number;
   consumeScreenshotRequest: () => boolean;
 };
 
@@ -65,6 +65,19 @@ export const createGameRuntime = ({
     birdSprite.texture = birdFrames[idx % birdFrames.length];
   };
 
+  const triggerGuardFailure = (): void => {
+    runtime.phase = 'game-over';
+    physics.setLinearVelocity(birdBody.bodyId, 0, 0);
+    physics.setAngularVelocity(birdBody.bodyId, 0);
+    physics.setFixedRotation(birdBody.bodyId, true);
+    physics.setGravityScale(birdBody.bodyId, 0);
+    physics.setAwake(birdBody.bodyId, false);
+    scene.pointsText.text = '0';
+    scene.hintText.text = 'YOU ARE CHEATED!';
+    scene.hintText.visible = true;
+    scene.gameOverSprite.visible = true;
+  };
+
   const resetGame = (): void => {
     pipeDirector.reset();
 
@@ -79,14 +92,10 @@ export const createGameRuntime = ({
     Position.y[birdEid] = BIRD_START_Y;
     birdSprite.rotation = 0;
 
-    runtime.phase = 'idle';
-    runtime.score = 0;
-    runtime.flapFrame = 0;
-    runtime.flapTimer = 0;
-    runtime.bobTimer = 0;
+    runtime.reset();
     birdCrashController.reset();
 
-    scene.scoreText.text = '0';
+    scene.pointsText.text = '0';
     scene.hintText.text = 'Click or press Space to flap';
     scene.hintText.visible = true;
     scene.gameOverSprite.visible = false;
@@ -118,7 +127,14 @@ export const createGameRuntime = ({
   };
 
   const update = (dt: number): void => {
-    scene.background.setNightTarget(isNightByScore(runtime.score));
+    if (!runtime.guard()) {
+      triggerGuardFailure();
+      return;
+    }
+
+    let mark = runtime.peek();
+
+    scene.background.setNightTarget(isNightByMark(mark));
     scene.background.update(dt);
 
     flushSoundQueue();
@@ -134,12 +150,12 @@ export const createGameRuntime = ({
     syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
 
     if (runtime.phase === 'playing') {
-      const currentSpeed = getPipeSpeedByScore(runtime.score);
-      const scoreDelta = pipeDirector.update(dt, currentSpeed, runtime.score);
+      const currentSpeed = getPipeSpeedByMark(mark);
+      const delta = pipeDirector.update(dt, currentSpeed, mark);
 
-      if (scoreDelta > 0) {
-        runtime.score += scoreDelta;
-        scene.scoreText.text = String(runtime.score);
+      if (delta > 0) {
+        mark = runtime.bump(delta);
+        scene.pointsText.text = String(mark);
         playSound(GAME_SFX.point);
       }
 
@@ -157,7 +173,7 @@ export const createGameRuntime = ({
     }
 
     if (runtime.phase === 'playing') {
-      const scroll = getPipeSpeedByScore(runtime.score) * dt;
+      const scroll = getPipeSpeedByMark(mark) * dt;
       scene.groundA.x -= scroll;
       scene.groundB.x -= scroll;
 
@@ -177,7 +193,7 @@ export const createGameRuntime = ({
     restart,
     update,
     getPhase: () => runtime.phase,
-    getScore: () => runtime.score,
+    peek: runtime.peek,
     consumeScreenshotRequest: birdCrashController.consumeScreenshotRequest,
   };
 };

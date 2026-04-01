@@ -110,5 +110,5 @@ export const spawnPipePair = ({
     flipY: false,
   });
 
-  pipePairs.push({ topEid, bottomEid, scored: false });
+  pipePairs.push({ topEid, bottomEid, passed: false });
 };

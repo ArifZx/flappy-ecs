@@ -17,7 +17,7 @@ type CreateShareImageCaptureParams = {
 type ComposeShareImageParams = {
   viewportCanvas: HTMLCanvasElement;
   scene: GameScene;
-  score: number;
+  tally: number;
   shareUrl: string;
   logoImage: CanvasImageSource | null;
 };
@@ -51,12 +51,13 @@ const drawRoundRect = (
   context.closePath();
 };
 
-const drawScoreBadge = (context: CanvasRenderingContext2D, score: number): void => {
+const drawValueBadge = (context: CanvasRenderingContext2D, tally: number): void => {
   const badgeWidth = 420;
-  const badgeHeight = 132;
+  const badgeHeight = 116;
   const badgeX = (SHARE_WIDTH - badgeWidth) * 0.5;
   const badgeY = 48;
   const badgeRadius = 36;
+  const valueY = badgeY + badgeHeight * 0.5;
 
   context.save();
   context.fillStyle = 'rgba(13, 18, 28, 0.72)';
@@ -64,18 +65,15 @@ const drawScoreBadge = (context: CanvasRenderingContext2D, score: number): void 
   context.fill();
 
   context.textAlign = 'center';
-  context.fillStyle = '#f4d35e';
-  context.font = '700 34px "Segoe UI", sans-serif';
-  context.fillText('SCORE', SHARE_WIDTH * 0.5, badgeY + 44);
-
+  context.textBaseline = 'middle';
   context.fillStyle = '#ffffff';
   context.strokeStyle = 'rgba(0, 0, 0, 0.42)';
   context.lineWidth = 12;
   context.lineJoin = 'round';
   context.font = '900 64px "Segoe UI", sans-serif';
-  const scoreText = String(score);
-  context.strokeText(scoreText, SHARE_WIDTH * 0.5, badgeY + 104);
-  context.fillText(scoreText, SHARE_WIDTH * 0.5, badgeY + 104);
+  const valueText = String(tally);
+  context.strokeText(valueText, SHARE_WIDTH * 0.5, valueY);
+  context.fillText(valueText, SHARE_WIDTH * 0.5, valueY);
   context.restore();
 };
 
@@ -166,11 +164,11 @@ const drawShareLogo = (context: CanvasRenderingContext2D, logoImage: CanvasImage
 };
 
 const captureViewportCanvas = (app: Application, scene: GameScene): HTMLCanvasElement => {
-  const previousScoreVisible = scene.scoreText.visible;
+  const previousPointsVisible = scene.pointsText.visible;
   const previousHintVisible = scene.hintText.visible;
   const previousGameOverVisible = scene.gameOverSprite.visible;
 
-  scene.scoreText.visible = false;
+  scene.pointsText.visible = false;
   scene.hintText.visible = false;
   scene.gameOverSprite.visible = false;
 
@@ -187,7 +185,7 @@ const captureViewportCanvas = (app: Application, scene: GameScene): HTMLCanvasEl
 
     return extractedCanvas;
   } finally {
-    scene.scoreText.visible = previousScoreVisible;
+    scene.pointsText.visible = previousPointsVisible;
     scene.hintText.visible = previousHintVisible;
     scene.gameOverSprite.visible = previousGameOverVisible;
   }
@@ -196,7 +194,7 @@ const captureViewportCanvas = (app: Application, scene: GameScene): HTMLCanvasEl
 const composeShareImage = ({
   viewportCanvas,
   scene,
-  score,
+  tally,
   shareUrl,
   logoImage,
 }: ComposeShareImageParams): string | null => {
@@ -231,7 +229,7 @@ const composeShareImage = ({
     SHARE_HEIGHT,
   );
 
-  drawScoreBadge(outputContext, score);
+  drawValueBadge(outputContext, tally);
   drawQrCard(outputContext, shareUrl);
   if (logoImage) {
     drawShareLogo(outputContext, logoImage);
@@ -257,7 +255,7 @@ export const createShareImageCapture = ({
   return composeShareImage({
     viewportCanvas,
     scene,
-    score: runtime.getScore(),
+    tally: runtime.peek(),
     shareUrl,
     logoImage,
   });

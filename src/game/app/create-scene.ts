@@ -14,7 +14,7 @@ export type GameScene = {
   birdLayer: Container;
   groundA: Sprite;
   groundB: Sprite;
-  scoreText: Text;
+  pointsText: Text;
   hintText: Text;
   gameOverSprite: Sprite;
 };
@@ -37,7 +37,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
   groundB.position.set(groundA.width, GROUND_Y);
   container.addChild(groundA, groundB);
 
-  const scoreText = new Text({
+  const pointsText = new Text({
     text: '0',
     style: {
       fontFamily: 'Arial',
@@ -46,9 +46,9 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
       stroke: { color: 0x000000, width: 4 },
     },
   });
-  scoreText.anchor.set(0.5, 0);
-  scoreText.position.set(GAME_WIDTH / 2, 16);
-  container.addChild(scoreText);
+  pointsText.anchor.set(0.5, 0);
+  pointsText.position.set(GAME_WIDTH / 2, 16);
+  container.addChild(pointsText);
 
   const hintText = new Text({
     text: 'Click or press Space to flap',
@@ -76,7 +76,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
     birdLayer,
     groundA,
     groundB,
-    scoreText,
+    pointsText,
     hintText,
     gameOverSprite,
   };

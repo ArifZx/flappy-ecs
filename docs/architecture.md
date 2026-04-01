@@ -52,10 +52,10 @@ The `game/app` folder now acts as the composition layer between bootstrap code a
 - `create-physics-backend.ts`: selects worker or main-thread physics
 - `create-runtime-context.ts`: creates ECS world, stores, queries, bird, and static bounds
 - `create-pipe-director.ts`: owns pipe spawning, deterministic pipe map, movement, and cleanup
-- `create-game-runtime.ts`: coordinates round state, input, score flow, and frame updates
+- `create-game-runtime.ts`: coordinates round state, input, mark flow, tamper guard checks, and frame updates
 - `create-bird-crash-controller.ts`: isolates collision resolution and bird crash transitions
 - `create-game-over-actions.ts`: creates restart and share DOM controls for the game-over phase
-- `create-share-image-capture.ts`: builds the exported share image with gameplay crop, score, QR, and logo
+- `create-share-image-capture.ts`: builds the exported share image with gameplay crop, value badge, QR, and logo
 
 This split keeps `main.ts` small while avoiding over-engineering.
 
@@ -265,7 +265,7 @@ This is useful because pipes are deterministic obstacles, so they do not need dy
 
 The pipe system also:
 
-- checks when the bird passes a pipe pair and increments score
+- checks when the bird passes a pipe pair and increments the runtime mark
 - destroys both pipe entities when they leave the screen
 - removes the related physics bodies via the adapter
 
@@ -434,7 +434,7 @@ The share image is not just a raw canvas dump anymore. It is composed intentiona
 ### What gets exported
 
 - a cropped gameplay image from the visible viewport
-- the current score rendered as a custom badge
+- the current run value rendered as a custom badge
 - a QR card pointing to `window.location.href`
 - the LCP poster logo in the lower-left corner
 
@@ -442,7 +442,7 @@ The share image is not just a raw canvas dump anymore. It is composed intentiona
 
 - in-game hint text
 - in-game game-over banner
-- the normal score HUD text
+- the normal points HUD text
 
 ### Export flow
 
@@ -453,7 +453,7 @@ flowchart TD
   C --> D[Temporarily hide HUD and banner]
   D --> E[Extract viewport canvas]
   E --> F[Compose share image]
-  F --> G[Draw score badge]
+  F --> G[Draw value badge]
   G --> H[Draw QR card]
   H --> I[Draw poster logo]
   I --> J[Store image in hidden img buffer]
@@ -582,7 +582,7 @@ Both are better than letting each client invent obstacle positions independently
 This project is already moving in the right direction with the `game/app` layer. As the project grows further, move these concerns into dedicated systems or services:
 
 - game phase transitions
-- score handling
+- run value handling
 - crash handling
 - backend selection
 - multiplayer replication
@@ -648,7 +648,7 @@ The refactor improved things a lot, but `create-game-runtime.ts` still coordinat
 - flap flow
 - collision outcomes
 - animation timing
-- score updates
+- run value updates and tamper checks
 - frame orchestration
 
 That is acceptable for this project size, but it is now the next likely hotspot if the game grows.
@@ -660,7 +660,7 @@ Some data is stored as ECS components, while other important data lives in plain
 - `pipePairs`
 - `pipeMap`
 - runtime booleans like crash state
-- score and phase-like state inside a custom resource object
+- mark state, tamper guard data, and phase-like state inside a custom resource object
 
 That is not inherently wrong, but it creates multiple state models. As the project grows, it becomes harder to know what should live in ECS versus what should stay as orchestration state.
 
@@ -740,11 +740,11 @@ If you want the highest return on effort from the current state, these are the n
 2. Formalize which runtime state belongs in ECS, which belongs in services, and which belongs in room or network state.
 3. Introduce a network-facing adapter layer similar to the physics adapter.
 4. Consider moving game-over DOM action styling and composition into a more explicit UI module if more menu states are added.
-5. Consider extracting score and round-reset flow from `create-game-runtime.ts` if more game modes are added.
+5. Consider extracting mark and round-reset flow from `create-game-runtime.ts` if more game modes are added.
 
 ## Recommended Next Steps
 
 1. Add a tiny debug overlay showing the active physics backend (`worker` or `main-thread`) and current phase.
 2. Introduce a network adapter above the physics adapter for multiplayer commands and snapshots.
 3. Decide whether future share-export layouts should remain canvas-composited or move to a template-based export pipeline.
-4. Decide whether score flow should stay inside the runtime controller or move into a dedicated round-state helper.
+4. Decide whether mark flow should stay inside the runtime controller or move into a dedicated round-state helper.

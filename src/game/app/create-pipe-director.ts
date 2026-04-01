@@ -24,7 +24,7 @@ type CreatePipeDirectorParams = {
 
 export type PipeDirector = {
   reset: () => void;
-  update: (dt: number, speed: number, score: number) => number;
+  update: (dt: number, speed: number, mark: number) => number;
 };
 
 export const createPipeDirector = ({
@@ -40,9 +40,9 @@ export const createPipeDirector = ({
     initialHeight: BIRD_START_Y,
   });
 
-  const refillPipeMap = (score: number): void => {
+  const refillPipeMap = (mark: number): void => {
     if (pipeMap.length >= 10) return;
-    pipeMap.push(...pipeMapProvider.nextEntries(score, 12));
+    pipeMap.push(...pipeMapProvider.nextEntries(mark, 12));
   };
 
   const getRightMostPipeX = (): number | null => {
@@ -56,8 +56,8 @@ export const createPipeDirector = ({
     return maxX;
   };
 
-  const spawnFromMap = (score: number): void => {
-    refillPipeMap(score);
+  const spawnFromMap = (mark: number): void => {
+    refillPipeMap(mark);
     const spawnLeadX = GAME_WIDTH + 120;
 
     while (true) {
@@ -102,8 +102,8 @@ export const createPipeDirector = ({
     pipeMapProvider.reset();
   };
 
-  const update = (dt: number, speed: number, score: number): number => {
-    spawnFromMap(score);
+  const update = (dt: number, speed: number, mark: number): number => {
+    spawnFromMap(mark);
 
     return moveAndCleanupPipes({
       dt,

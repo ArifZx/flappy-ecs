@@ -12,4 +12,11 @@ export default defineConfig({
   preview: {
     headers: sharedArrayBufferHeaders,
   },
+  build: {
+    minify: 'terser',
+    terserOptions: {
+      mangle: true,
+      keep_fnames: false
+    }
+  }
 });

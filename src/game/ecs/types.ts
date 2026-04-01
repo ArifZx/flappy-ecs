@@ -4,7 +4,7 @@ import type { QueryResult } from 'bitecs';
 export type PipePair = {
   topEid: number;
   bottomEid: number;
-  scored: boolean;
+  passed: boolean;
 };
 
 export type EntityStores = {

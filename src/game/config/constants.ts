@@ -6,7 +6,7 @@ export const PIPE_SPEED = 90;
 export const PIPE_SPEED_MAX = 165;
 export const PIPE_GAP = 130;
 export const PIPE_SPAWN_INTERVAL = 1.4;
-export const NIGHT_MODE_SCORE_STEP = 23;
+export const NIGHT_MODE_STEP = 23;
 export const BIRD_X = 78;
 export const BIRD_START_Y = 220;
 

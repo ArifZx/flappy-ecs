@@ -1,5 +1,5 @@
 import { GROUND_Y } from '../config/constants';
-import { getGlobalDifficultyByScore, getPipeGapByScore } from './difficulty';
+import { getGlobalDifficultyByMark, getPipeGapByMark } from './difficulty';
 
 export type PipeMapEntry = {
   id: number;
@@ -21,7 +21,7 @@ type PipeMapState = {
 
 export type PipeMapProvider = {
   reset: () => void;
-  nextEntries: (score: number, count: number) => PipeMapEntry[];
+  nextEntries: (mark: number, count: number) => PipeMapEntry[];
 };
 
 type CreatePipeMapProviderParams = {
@@ -69,20 +69,20 @@ const createPipeMapState = (initialHeight: number): PipeMapState => ({
 });
 
 type GeneratePipeMapEntriesParams = {
-  score: number;
+  mark: number;
   count: number;
   state: PipeMapState;
   rng: () => number;
 };
 
 const generatePipeMapEntries = ({
-  score,
+  mark,
   count,
   state,
   rng,
 }: GeneratePipeMapEntriesParams): PipeMapEntry[] => {
   const entries: PipeMapEntry[] = [];
-  const difficulty = getGlobalDifficultyByScore(score);
+  const difficulty = getGlobalDifficultyByMark(mark);
 
   for (let i = 0; i < count; i += 1) {
     if (state.segmentRemaining <= 0) {
@@ -130,7 +130,7 @@ const generatePipeMapEntries = ({
       GROUND_Y - MAX_HEIGHT_PADDING,
     );
 
-    const baseGap = getPipeGapByScore(score, rng());
+    const baseGap = getPipeGapByMark(mark, rng());
     const closeness = clamp((NORMAL_SPACING_MIN - xSpacing) / (NORMAL_SPACING_MIN - CLOSE_SPACING_MIN), 0, 1);
     const closeGapBonus = closeness * (10 + difficulty * 7);
     const gap = Math.min(baseGap + closeGapBonus, 170);
@@ -162,9 +162,9 @@ export const createPipeMapProvider = ({
       state = createPipeMapState(initialHeight);
       rng = createMulberry32(seed);
     },
-    nextEntries: (score: number, count: number): PipeMapEntry[] =>
+    nextEntries: (mark: number, count: number): PipeMapEntry[] =>
       generatePipeMapEntries({
-        score,
+        mark,
         count,
         state,
         rng,

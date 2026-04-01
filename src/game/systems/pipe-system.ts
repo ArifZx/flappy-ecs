@@ -32,7 +32,7 @@ export const moveAndCleanupPipes = ({
     physics.setTransform(BodyRef.id[eid], pxToM(Position.x[eid]), pxToM(Position.y[eid]), 0);
   }
 
-  let scoredCount = 0;
+  let passedCount = 0;
 
   for (let i = pipePairs.length - 1; i >= 0; i -= 1) {
     const pair = pipePairs[i];
@@ -42,9 +42,9 @@ export const moveAndCleanupPipes = ({
     }
 
     const pairX = Position.x[pair.topEid];
-    if (!pair.scored && pairX < BIRD_X) {
-      pair.scored = true;
-      scoredCount += 1;
+    if (!pair.passed && pairX < BIRD_X) {
+      pair.passed = true;
+      passedCount += 1;
     }
 
     if (pairX < -60) {
@@ -58,5 +58,5 @@ export const moveAndCleanupPipes = ({
     }
   }
 
-  return scoredCount;
+  return passedCount;
 };
