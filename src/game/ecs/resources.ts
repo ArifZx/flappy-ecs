@@ -6,11 +6,28 @@ export const GamePhase = {
 
 export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
 
+export type PipeSpawnPlanEntry = {
+  id: number;
+  x: number;
+  gap: number;
+  height: number;
+};
+
+export type PipePairState = {
+  planId: number;
+  topEid: number;
+  bottomEid: number;
+  passed: boolean;
+};
+
+export type PipeRuntimeResource = {
+  activePairs: PipePairState[];
+  pendingEntries: PipeSpawnPlanEntry[];
+  reset: () => void;
+};
+
 export type GameRuntimeResource = {
   phase: GamePhase;
-  flapFrame: number;
-  flapTimer: number;
-  bobTimer: number;
   reset: () => void;
   peek: () => number;
   bump: (delta: number) => number;
@@ -32,6 +49,15 @@ const mix32 = (value: number): number => {
   mixed ^= mixed >>> 16;
   return mixed >>> 0;
 };
+
+export const createPipeRuntimeResource = (): PipeRuntimeResource => ({
+  activePairs: [],
+  pendingEntries: [],
+  reset() {
+    this.activePairs.length = 0;
+    this.pendingEntries.length = 0;
+  },
+});
 
 export const createGameRuntimeResource = (): GameRuntimeResource => {
   const maskA = randomUint32();
@@ -89,14 +115,8 @@ export const createGameRuntimeResource = (): GameRuntimeResource => {
 
   const resource: GameRuntimeResource = {
     phase: GamePhase.Idle,
-    flapFrame: 0,
-    flapTimer: 0,
-    bobTimer: 0,
     reset: () => {
       resource.phase = GamePhase.Idle;
-      resource.flapFrame = 0;
-      resource.flapTimer = 0;
-      resource.bobTimer = 0;
       write(0);
     },
     peek: () => unpack(),

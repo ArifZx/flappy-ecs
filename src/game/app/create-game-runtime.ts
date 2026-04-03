@@ -1,19 +1,13 @@
 import type { Spritesheet } from 'pixi.js';
 
 import {
-  BIRD_START_Y,
-  BIRD_X,
-  pxToM,
-} from '../config/constants';
-import { GAME_SFX, flushSoundQueue, playSound } from '../audio/sound';
-import { createGameRuntimeResource, GamePhase } from '../ecs/resources';
-import { Position } from '../ecs/components';
+  createGameRuntimeResource,
+  createPipeRuntimeResource,
+  GamePhase,
+} from '../ecs/resources';
 import type { PhysicsAdapter } from '../physics';
-import { getPipeSpeedByMark, isNightByMark } from '../systems/difficulty';
-import {
-  syncBirdFromPhysics,
-  syncSpritesFromPosition,
-} from '../systems/render-system';
+import { createGameplaySystem } from '../systems/gameplay-system';
+import { createOfflineRoundSystem } from '../systems/offline-round-system';
 import { createBirdCrashController } from './create-bird-crash-controller';
 import { createPipeDirector } from './create-pipe-director';
 import type { GameScene } from './create-scene';
@@ -45,9 +39,11 @@ export const createGameRuntime = ({
     sheet,
   });
   const { birdEid, birdBody, birdSprite, birdFrames } = context.bird;
+  const pipeRuntime = createPipeRuntimeResource();
   const pipeDirector = createPipeDirector({
     context,
     physics,
+    pipeRuntime,
     scene,
     sheet,
   });
@@ -60,140 +56,32 @@ export const createGameRuntime = ({
     birdBodyId: birdBody.bodyId,
     birdSprite,
   });
-
-  const setBirdPose = (idx: number): void => {
-    birdSprite.texture = birdFrames[idx % birdFrames.length];
-  };
-
-  const triggerGuardFailure = (): void => {
-    runtime.phase = GamePhase.GameOver;
-    physics.setLinearVelocity(birdBody.bodyId, 0, 0);
-    physics.setAngularVelocity(birdBody.bodyId, 0);
-    physics.setFixedRotation(birdBody.bodyId, true);
-    physics.setGravityScale(birdBody.bodyId, 0);
-    physics.setAwake(birdBody.bodyId, false);
-    scene.pointsText.text = '0';
-    scene.hintText.text = 'YOU ARE CHEATED!';
-    scene.hintText.visible = true;
-    scene.gameOverSprite.visible = true;
-  };
-
-  const resetGame = (): void => {
-    pipeDirector.reset();
-
-    physics.setTransform(birdBody.bodyId, pxToM(BIRD_X), pxToM(BIRD_START_Y), 0);
-    physics.setLinearVelocity(birdBody.bodyId, 0, 0);
-    physics.setAngularVelocity(birdBody.bodyId, 0);
-    physics.setFixedRotation(birdBody.bodyId, true);
-    physics.setGravityScale(birdBody.bodyId, 0);
-    physics.setAwake(birdBody.bodyId, true);
-
-    Position.x[birdEid] = BIRD_X;
-    Position.y[birdEid] = BIRD_START_Y;
-    birdSprite.rotation = 0;
-
-    runtime.reset();
-    birdCrashController.reset();
-
-    scene.pointsText.text = '0';
-    scene.hintText.text = 'Click or press Space to flap';
-    scene.hintText.visible = true;
-    scene.gameOverSprite.visible = false;
-    scene.background.reset();
-    setBirdPose(1);
-  };
+  const gameplaySystem = createGameplaySystem({
+    context,
+    physics,
+    runtime,
+    scene,
+    pipeDirector,
+    bird: { birdEid, birdBody, birdSprite, birdFrames },
+    updateCrashState: birdCrashController.update,
+  });
+  const roundSystem = createOfflineRoundSystem({
+    physics,
+    runtime,
+    pipeDirector,
+    birdCrashController,
+    gameplaySystem,
+    bird: { birdEid, birdBody },
+  });
 
   physics.onContact(birdCrashController.handleContact);
 
-  const restart = (): void => {
-    resetGame();
-    playSound(GAME_SFX.swoosh);
-  };
-
-  const flap = (): void => {
-    if (runtime.phase === GamePhase.GameOver) {
-      return;
-    }
-
-    if (runtime.phase === GamePhase.Idle) {
-      runtime.phase = GamePhase.Playing;
-      physics.setGravityScale(birdBody.bodyId, 1);
-      scene.hintText.visible = false;
-      playSound(GAME_SFX.swoosh);
-    }
-
-    physics.setLinearVelocity(birdBody.bodyId, 0, -7.2);
-    playSound(GAME_SFX.flap);
-  };
-
-  const update = (dt: number): void => {
-    if (!runtime.guard()) {
-      triggerGuardFailure();
-      return;
-    }
-
-    let mark = runtime.peek();
-
-    scene.background.setNightTarget(isNightByMark(mark));
-    scene.background.update(dt);
-
-    flushSoundQueue();
-
-    if (runtime.phase === GamePhase.Idle) {
-      runtime.bobTimer += dt;
-      Position.y[birdEid] = BIRD_START_Y + Math.sin(runtime.bobTimer * 5) * 6;
-      syncSpritesFromPosition({ renderQuery: context.renderQuery, stores: context.stores });
-      return;
-    }
-
-    physics.step(dt);
-    syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
-
-    if (runtime.phase === GamePhase.Playing) {
-      const currentSpeed = getPipeSpeedByMark(mark);
-      const delta = pipeDirector.update(dt, currentSpeed, mark);
-
-      if (delta > 0) {
-        mark = runtime.bump(delta);
-        scene.pointsText.text = String(mark);
-        playSound(GAME_SFX.point);
-      }
-
-      runtime.flapTimer += dt;
-      if (runtime.flapTimer >= 0.12) {
-        runtime.flapTimer = 0;
-        runtime.flapFrame = (runtime.flapFrame + 1) % birdFrames.length;
-        setBirdPose(runtime.flapFrame);
-      }
-
-      const velocityY = physics.shared.velocityY[birdBody.bodyId];
-      birdSprite.rotation = Math.max(-0.6, Math.min(1.2, velocityY * 0.08));
-    } else {
-      birdCrashController.update(dt);
-    }
-
-    if (runtime.phase === GamePhase.Playing) {
-      const scroll = getPipeSpeedByMark(mark) * dt;
-      scene.groundA.x -= scroll;
-      scene.groundB.x -= scroll;
-
-      if (scene.groundA.x + scene.groundA.width <= 0) {
-        scene.groundA.x = scene.groundB.x + scene.groundB.width;
-      }
-      if (scene.groundB.x + scene.groundB.width <= 0) {
-        scene.groundB.x = scene.groundA.x + scene.groundA.width;
-      }
-    }
-
-    syncSpritesFromPosition({ renderQuery: context.renderQuery, stores: context.stores });
-  };
-
   return {
-    flap,
-    restart,
-    update,
-    getPhase: () => runtime.phase,
-    peek: runtime.peek,
+    flap: roundSystem.flap,
+    restart: roundSystem.restart,
+    update: roundSystem.update,
+    getPhase: roundSystem.getPhase,
+    peek: roundSystem.peekMark,
     consumeScreenshotRequest: birdCrashController.consumeScreenshotRequest,
   };
 };

@@ -1,12 +1,8 @@
+import type { PipeSpawnPlanEntry } from '../ecs/resources';
 import { GROUND_Y } from '../config/constants';
 import { getGlobalDifficultyByMark, getPipeGapByMark } from './difficulty';
 
-export type PipeMapEntry = {
-  id: number;
-  x: number;
-  gap: number;
-  height: number;
-};
+export type PipeMapEntry = PipeSpawnPlanEntry;
 
 type PipePattern = 'flat' | 'up' | 'down' | 'wave';
 

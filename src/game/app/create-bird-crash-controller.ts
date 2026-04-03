@@ -1,6 +1,10 @@
 import { GAME_SFX, playSound } from '../audio/sound';
 import { GamePhase, type GameRuntimeResource } from '../ecs/resources';
-import type { PhysicsAdapter, PhysicsContactEvent } from '../physics';
+import {
+  PhysicsBodyKinds,
+  type PhysicsAdapter,
+  type PhysicsContactEvent,
+} from '../physics';
 import type { GameScene } from './create-scene';
 
 type CreateBirdCrashControllerParams = {
@@ -61,15 +65,15 @@ export const createBirdCrashController = ({
       const dataA = event.userDataA;
       const dataB = event.userDataB;
 
-      const hitBird = dataA?.type === 'bird' || dataB?.type === 'bird';
-      const hitGround = dataA?.type === 'ground' || dataB?.type === 'ground';
-      const hitPipe = dataA?.type === 'pipe' || dataB?.type === 'pipe';
+      const hitBird = dataA?.kind === PhysicsBodyKinds.Bird || dataB?.kind === PhysicsBodyKinds.Bird;
+      const hitGround = dataA?.kind === PhysicsBodyKinds.Ground || dataB?.kind === PhysicsBodyKinds.Ground;
+      const hitPipe = dataA?.kind === PhysicsBodyKinds.Pipe || dataB?.kind === PhysicsBodyKinds.Pipe;
       const hitPipeGroundOrCeiling =
         hitPipe ||
-        dataA?.type === 'ground' ||
-        dataB?.type === 'ground' ||
-        dataA?.type === 'ceiling' ||
-        dataB?.type === 'ceiling';
+        dataA?.kind === PhysicsBodyKinds.Ground ||
+        dataB?.kind === PhysicsBodyKinds.Ground ||
+        dataA?.kind === PhysicsBodyKinds.Ceiling ||
+        dataB?.kind === PhysicsBodyKinds.Ceiling;
 
       if (hitBird && hitPipeGroundOrCeiling && runtime.phase !== GamePhase.GameOver) {
         enterGameOver(hitPipe);

@@ -4,7 +4,8 @@ import type { World as EcsWorld } from 'bitecs';
 import { BIRD_X, pxToM } from '../config/constants';
 import { BodyRef, Position } from '../ecs/components';
 import { destroyEntity } from '../ecs/entity-lifecycle';
-import type { EcsQuery, EntityStores, PipePair } from '../ecs/types';
+import type { PipePairState } from '../ecs/resources';
+import type { EcsQuery, EntityStores } from '../ecs/types';
 import type { PhysicsAdapter } from '../physics';
 
 type MoveAndCleanupPipesParams = {
@@ -14,7 +15,7 @@ type MoveAndCleanupPipesParams = {
   physics: PhysicsAdapter;
   stores: EntityStores;
   pipeQuery: EcsQuery;
-  pipePairs: PipePair[];
+  pipePairs: PipePairState[];
 };
 
 export const moveAndCleanupPipes = ({

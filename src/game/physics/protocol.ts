@@ -1,5 +1,14 @@
 import type { PhysicsSharedBuffers } from './shared-state';
 
+export const PhysicsBodyKind = {
+  Bird: 1,
+  Ground: 2,
+  Pipe: 3,
+  Ceiling: 4,
+} as const;
+
+export type PhysicsBodyKind = (typeof PhysicsBodyKind)[keyof typeof PhysicsBodyKind];
+
 export type PhysicsBodyShape =
   | {
       kind: 'dynamic-circle';
@@ -18,7 +27,7 @@ export type PhysicsBodyShape =
     };
 
 export type PhysicsBodyUserData = {
-  type: string;
+  kind: PhysicsBodyKind;
   eid: number;
 };
 
