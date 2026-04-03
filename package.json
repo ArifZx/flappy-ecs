@@ -1,22 +1,15 @@
 {
-  "name": "flappy",
+  "name": "flappy-workspace",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "typescript": "~5.9.3",
-    "vite": "^8.0.1"
-  },
-  "dependencies": {
-    "@pixi/sound": "^6.0.1",
-    "bitecs": "^0.4.0",
-    "pixi.js": "^8.17.1",
-    "planck": "^1.4.3",
-    "qr-creator": "^1.0.0"
+    "dev": "pnpm --filter @flappy/web dev",
+    "dev:web": "pnpm --filter @flappy/web dev",
+    "dev:server": "pnpm --filter @flappy/server dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @flappy/web build",
+    "build:server": "pnpm --filter @flappy/server build",
+    "preview": "pnpm --filter @flappy/web preview",
+    "typecheck": "pnpm -r typecheck"
   }
 }

@@ -6,6 +6,7 @@ import {
   GamePhase,
 } from '../ecs/resources';
 import type { PhysicsAdapter } from '../physics';
+import { getPipeSpeedByMark } from '../systems/difficulty';
 import { createGameplaySystem } from '../systems/gameplay-system';
 import { createOfflineRoundSystem } from '../systems/offline-round-system';
 import { createBirdCrashController } from './create-bird-crash-controller';
@@ -25,6 +26,17 @@ export type GameRuntimeController = {
   update: (dt: number) => void;
   getPhase: () => GamePhase;
   peek: () => number;
+  getSnapshotState: () => {
+    screenX: number;
+    screenY: number;
+    worldX: number;
+    worldOffset: number;
+    rotation: number;
+    score: number;
+    progress: number;
+    alive: boolean;
+    finished: boolean;
+  };
   consumeScreenshotRequest: () => boolean;
 };
 
@@ -76,12 +88,34 @@ export const createGameRuntime = ({
 
   physics.onContact(birdCrashController.handleContact);
 
+  let worldOffset = 0;
+
   return {
     flap: roundSystem.flap,
-    restart: roundSystem.restart,
-    update: roundSystem.update,
+    restart: () => {
+      worldOffset = 0;
+      roundSystem.restart();
+    },
+    update: (dt) => {
+      if (runtime.phase === GamePhase.Playing) {
+        worldOffset += getPipeSpeedByMark(runtime.peek()) * dt;
+      }
+
+      roundSystem.update(dt);
+    },
     getPhase: roundSystem.getPhase,
     peek: roundSystem.peekMark,
+    getSnapshotState: () => ({
+      screenX: birdSprite.x,
+      screenY: birdSprite.y,
+      worldX: worldOffset + birdSprite.x,
+      worldOffset,
+      rotation: birdSprite.rotation,
+      score: runtime.peek(),
+      progress: runtime.peek(),
+      alive: runtime.phase !== GamePhase.GameOver,
+      finished: runtime.phase === GamePhase.GameOver,
+    }),
     consumeScreenshotRequest: birdCrashController.consumeScreenshotRequest,
   };
 };

@@ -11,6 +11,7 @@ export type GameScene = {
   container: Container;
   background: BackgroundController;
   pipesLayer: Container;
+  remoteBirdLayer: Container;
   birdLayer: Container;
   groundA: Sprite;
   groundB: Sprite;
@@ -26,8 +27,9 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
   container.addChild(background.container);
 
   const pipesLayer = new Container();
+  const remoteBirdLayer = new Container();
   const birdLayer = new Container();
-  container.addChild(pipesLayer, birdLayer);
+  container.addChild(pipesLayer, remoteBirdLayer, birdLayer);
 
   const groundA = new Sprite(sheet.textures.base);
   const groundB = new Sprite(sheet.textures.base);
@@ -73,6 +75,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
     container,
     background,
     pipesLayer,
+    remoteBirdLayer,
     birdLayer,
     groundA,
     groundB,
