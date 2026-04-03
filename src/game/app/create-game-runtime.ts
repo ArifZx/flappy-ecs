@@ -6,7 +6,7 @@ import {
   pxToM,
 } from '../config/constants';
 import { GAME_SFX, flushSoundQueue, playSound } from '../audio/sound';
-import { createGameRuntimeResource, type GamePhase } from '../ecs/resources';
+import { createGameRuntimeResource, GamePhase } from '../ecs/resources';
 import { Position } from '../ecs/components';
 import type { PhysicsAdapter } from '../physics';
 import { getPipeSpeedByMark, isNightByMark } from '../systems/difficulty';
@@ -66,7 +66,7 @@ export const createGameRuntime = ({
   };
 
   const triggerGuardFailure = (): void => {
-    runtime.phase = 'game-over';
+    runtime.phase = GamePhase.GameOver;
     physics.setLinearVelocity(birdBody.bodyId, 0, 0);
     physics.setAngularVelocity(birdBody.bodyId, 0);
     physics.setFixedRotation(birdBody.bodyId, true);
@@ -111,12 +111,12 @@ export const createGameRuntime = ({
   };
 
   const flap = (): void => {
-    if (runtime.phase === 'game-over') {
+    if (runtime.phase === GamePhase.GameOver) {
       return;
     }
 
-    if (runtime.phase === 'idle') {
-      runtime.phase = 'playing';
+    if (runtime.phase === GamePhase.Idle) {
+      runtime.phase = GamePhase.Playing;
       physics.setGravityScale(birdBody.bodyId, 1);
       scene.hintText.visible = false;
       playSound(GAME_SFX.swoosh);
@@ -139,7 +139,7 @@ export const createGameRuntime = ({
 
     flushSoundQueue();
 
-    if (runtime.phase === 'idle') {
+    if (runtime.phase === GamePhase.Idle) {
       runtime.bobTimer += dt;
       Position.y[birdEid] = BIRD_START_Y + Math.sin(runtime.bobTimer * 5) * 6;
       syncSpritesFromPosition({ renderQuery: context.renderQuery, stores: context.stores });
@@ -149,7 +149,7 @@ export const createGameRuntime = ({
     physics.step(dt);
     syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
 
-    if (runtime.phase === 'playing') {
+    if (runtime.phase === GamePhase.Playing) {
       const currentSpeed = getPipeSpeedByMark(mark);
       const delta = pipeDirector.update(dt, currentSpeed, mark);
 
@@ -172,7 +172,7 @@ export const createGameRuntime = ({
       birdCrashController.update(dt);
     }
 
-    if (runtime.phase === 'playing') {
+    if (runtime.phase === GamePhase.Playing) {
       const scroll = getPipeSpeedByMark(mark) * dt;
       scene.groundA.x -= scroll;
       scene.groundB.x -= scroll;

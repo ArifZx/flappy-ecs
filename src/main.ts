@@ -13,7 +13,7 @@ import {
 } from './game/app/create-physics-backend';
 import { createGameRuntime } from './game/app/create-game-runtime';
 import { createGameScene } from './game/app/create-scene';
-import type { GamePhase } from './game/ecs/resources';
+import { GamePhase } from './game/ecs/resources';
 
 const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
 
@@ -91,8 +91,8 @@ const PHYSICS_BACKEND: PhysicsBackendName = 'worker';
 
     const phase = runtime.getPhase();
     if (phase !== lastPhase) {
-      gameOverActions.setVisible(phase === 'game-over');
-      if (phase !== 'game-over') {
+      gameOverActions.setVisible(phase === GamePhase.GameOver);
+      if (phase !== GamePhase.GameOver) {
         gameOverActions.setScreenshotSrc(null);
       }
       lastPhase = phase;

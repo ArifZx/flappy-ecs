@@ -1,4 +1,8 @@
-export type GamePhase = 'idle' | 'playing' | 'game-over';
+export enum GamePhase {
+  Idle = 0,
+  Playing = 1,
+  GameOver = 2,
+}
 
 export type GameRuntimeResource = {
   phase: GamePhase;
@@ -82,12 +86,12 @@ export const createGameRuntimeResource = (): GameRuntimeResource => {
   };
 
   const resource: GameRuntimeResource = {
-    phase: 'idle',
+    phase: GamePhase.Idle,
     flapFrame: 0,
     flapTimer: 0,
     bobTimer: 0,
     reset: () => {
-      resource.phase = 'idle';
+      resource.phase = GamePhase.Idle;
       resource.flapFrame = 0;
       resource.flapTimer = 0;
       resource.bobTimer = 0;

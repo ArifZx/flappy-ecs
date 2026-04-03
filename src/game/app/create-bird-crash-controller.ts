@@ -1,5 +1,5 @@
 import { GAME_SFX, playSound } from '../audio/sound';
-import type { GameRuntimeResource } from '../ecs/resources';
+import { GamePhase, type GameRuntimeResource } from '../ecs/resources';
 import type { PhysicsAdapter, PhysicsContactEvent } from '../physics';
 import type { GameScene } from './create-scene';
 
@@ -30,7 +30,7 @@ export const createBirdCrashController = ({
   let screenshotRequested = false;
 
   const enterGameOver = (hitPipe: boolean): void => {
-    runtime.phase = 'game-over';
+    runtime.phase = GamePhase.GameOver;
     screenshotRequested = true;
     physics.setFixedRotation(birdBodyId, false);
     physics.setAngularVelocity(birdBodyId, 6);
@@ -71,16 +71,16 @@ export const createBirdCrashController = ({
         dataA?.type === 'ceiling' ||
         dataB?.type === 'ceiling';
 
-      if (hitBird && hitPipeGroundOrCeiling && runtime.phase !== 'game-over') {
+      if (hitBird && hitPipeGroundOrCeiling && runtime.phase !== GamePhase.GameOver) {
         enterGameOver(hitPipe);
       }
 
-      if (runtime.phase === 'game-over' && hitBird && hitGround && !birdLandedAfterCrash) {
+      if (runtime.phase === GamePhase.GameOver && hitBird && hitGround && !birdLandedAfterCrash) {
         landBirdAfterCrash();
       }
     },
     update: (dt) => {
-      if (runtime.phase === 'game-over' && !birdLandedAfterCrash) {
+      if (runtime.phase === GamePhase.GameOver && !birdLandedAfterCrash) {
         birdSprite.rotation = Math.min(1.45, birdSprite.rotation + dt * 5);
       }
     },
