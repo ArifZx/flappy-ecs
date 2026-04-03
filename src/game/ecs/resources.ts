@@ -1,8 +1,10 @@
-export enum GamePhase {
-  Idle = 0,
-  Playing = 1,
-  GameOver = 2,
-}
+export const GamePhase = {
+  Idle: 0,
+  Playing: 1,
+  GameOver: 2,
+} as const;
+
+export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
 
 export type GameRuntimeResource = {
   phase: GamePhase;
