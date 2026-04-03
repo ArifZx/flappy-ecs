@@ -21,7 +21,7 @@ src/
     ecs/                   # ECS components, shared runtime state, lifecycle helpers
     entities/              # Entity factories (bird, pipe)
     physics/               # Physics adapter, worker protocol, SAB state
-    systems/               # Update systems (render, pipes, difficulty, map)
+    systems/               # Update systems (simulation, presentation, render, pipes, difficulty, map)
     ui/                    # Background and UI helpers
 ```
 
@@ -52,10 +52,19 @@ The `game/app` folder now acts as the composition layer between bootstrap code a
 - `create-physics-backend.ts`: selects worker or main-thread physics
 - `create-runtime-context.ts`: creates ECS world, stores, queries, bird, and static bounds
 - `create-pipe-director.ts`: owns pipe spawning, deterministic pipe map, movement, and cleanup
-- `create-game-runtime.ts`: coordinates round state, input, mark flow, tamper guard checks, and frame updates
+- `create-game-runtime.ts`: wires the active mode controller into app bootstrap
 - `create-bird-crash-controller.ts`: isolates collision resolution and bird crash transitions
 - `create-game-over-actions.ts`: creates restart and share DOM controls for the game-over phase
 - `create-share-image-capture.ts`: builds the exported share image with gameplay crop, value badge, QR, and logo
+
+The `game/systems` folder now owns the continuous gameplay loop more explicitly:
+
+- `simulation-system.ts`: advances guarded gameplay state, steps physics-backed bird simulation, and resolves score progression from pipe passage
+- `presentation-system.ts`: applies scene updates, idle animation, bird pose, ground scroll, and HUD visibility from simulation output
+- `gameplay-system.ts`: coordinates simulation output into presentation without putting orchestration back into the app layer
+- `offline-round-system.ts`: owns offline-only round start, restart, reset, and flap flow for the current single-player mode
+- `pipe-system.ts`: performs ECS pipe movement, pass detection, and cleanup
+- `render-system.ts`: syncs physics and ECS state into Pixi sprites
 
 This split keeps `main.ts` small while avoiding over-engineering.
 
