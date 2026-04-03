@@ -5,8 +5,9 @@ import type { World as EcsWorld } from 'bitecs';
 
 import { pxToM } from '../config/constants';
 import { BodyRef, PipeTag, Position, SpriteRef } from '../ecs/components';
-import type { EntityStores, PipePair } from '../ecs/types';
-import type { PhysicsAdapter } from '../physics';
+import type { EntityStores } from '../ecs/types';
+import type { PipePairState, PipeSpawnPlanEntry } from '../ecs/resources';
+import { PhysicsBodyKinds, type PhysicsAdapter } from '../physics';
 
 type CreatePipeSegmentParams = {
   ecsWorld: EcsWorld;
@@ -55,7 +56,7 @@ const createPipeSegment = ({
       halfWidth: pxToM(26),
       halfHeight: pxToM(160),
     },
-    userData: { type: 'pipe', eid },
+    userData: { kind: PhysicsBodyKinds.Pipe, eid },
   });
   BodyRef.id[eid] = body.bodyId;
 
@@ -68,10 +69,7 @@ type SpawnPipePairParams = {
   stores: EntityStores;
   pipesLayer: Container;
   sheet: Spritesheet;
-  pipePairs: PipePair[];
-  x: number;
-  gap: number;
-  height: number;
+  entry: PipeSpawnPlanEntry;
 };
 
 export const spawnPipePair = ({
@@ -80,11 +78,9 @@ export const spawnPipePair = ({
   stores,
   pipesLayer,
   sheet,
-  pipePairs,
-  x,
-  gap,
-  height,
-}: SpawnPipePairParams): void => {
+  entry,
+}: SpawnPipePairParams): PipePairState => {
+  const { id, x, gap, height } = entry;
   const topCenterY = height - gap / 2 - 160;
   const bottomCenterY = height + gap / 2 + 160;
 
@@ -110,5 +106,5 @@ export const spawnPipePair = ({
     flipY: false,
   });
 
-  pipePairs.push({ topEid, bottomEid, passed: false });
+  return { planId: id, topEid, bottomEid, passed: false };
 };

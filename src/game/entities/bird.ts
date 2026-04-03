@@ -12,7 +12,11 @@ import {
   SpriteRef,
 } from '../ecs/components';
 import type { EntityStores } from '../ecs/types';
-import type { PhysicsAdapter, PhysicsBodyHandle } from '../physics';
+import {
+  PhysicsBodyKinds,
+  type PhysicsAdapter,
+  type PhysicsBodyHandle,
+} from '../physics';
 
 export type BirdEntityBundle = {
   birdEid: number;
@@ -136,7 +140,7 @@ export const createBirdEntity = ({
       fixedRotation: true,
       linearDamping: 0,
     },
-    userData: { type: 'bird', eid: birdEid },
+    userData: { kind: PhysicsBodyKinds.Bird, eid: birdEid },
   });
 
   BodyRef.id[birdEid] = birdBody.bodyId;

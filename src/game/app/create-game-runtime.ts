@@ -1,6 +1,10 @@
 import type { Spritesheet } from 'pixi.js';
 
-import { createGameRuntimeResource, GamePhase } from '../ecs/resources';
+import {
+  createGameRuntimeResource,
+  createPipeRuntimeResource,
+  GamePhase,
+} from '../ecs/resources';
 import type { PhysicsAdapter } from '../physics';
 import { createGameplaySystem } from '../systems/gameplay-system';
 import { createOfflineRoundSystem } from '../systems/offline-round-system';
@@ -35,9 +39,11 @@ export const createGameRuntime = ({
     sheet,
   });
   const { birdEid, birdBody, birdSprite, birdFrames } = context.bird;
+  const pipeRuntime = createPipeRuntimeResource();
   const pipeDirector = createPipeDirector({
     context,
     physics,
+    pipeRuntime,
     scene,
     sheet,
   });

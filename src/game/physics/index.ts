@@ -1,11 +1,13 @@
 export type { PhysicsAdapter, PhysicsBodyHandle, PhysicsContactListener } from './adapter';
 export type {
+  PhysicsBodyKind,
   PhysicsBodyShape,
   PhysicsBodyUserData,
   PhysicsContactEvent,
   PhysicsWorkerRequest,
   PhysicsWorkerResponse,
 } from './protocol';
+export { PhysicsBodyKind as PhysicsBodyKinds } from './protocol';
 export {
   createPhysicsSharedBuffers,
   createPhysicsSharedViews,

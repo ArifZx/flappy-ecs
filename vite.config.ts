@@ -16,7 +16,9 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       mangle: true,
-      keep_fnames: false
+      keep_fnames: false,
+      keep_classnames: false,
+      toplevel: true,
     }
   }
 });

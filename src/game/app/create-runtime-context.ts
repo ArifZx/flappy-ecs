@@ -12,7 +12,7 @@ import {
 } from '../ecs/components';
 import type { EntityStores } from '../ecs/types';
 import { createBirdEntity } from '../entities/bird';
-import type { PhysicsAdapter } from '../physics';
+import { PhysicsBodyKinds, type PhysicsAdapter } from '../physics';
 import type { GameScene } from './create-scene';
 
 type CreateRuntimeContextParams = {
@@ -57,7 +57,7 @@ export const createRuntimeContext = ({
       halfWidth: pxToM(GAME_WIDTH / 2),
       halfHeight: pxToM(GROUND_HEIGHT / 2),
     },
-    userData: { type: 'ground', eid: -1 },
+    userData: { kind: PhysicsBodyKinds.Ground, eid: -1 },
   });
 
   physics.createBody({
@@ -69,7 +69,7 @@ export const createRuntimeContext = ({
       halfWidth: pxToM(GAME_WIDTH / 2),
       halfHeight: pxToM(12),
     },
-    userData: { type: 'ceiling', eid: -1 },
+    userData: { kind: PhysicsBodyKinds.Ceiling, eid: -1 },
   });
 
   return {

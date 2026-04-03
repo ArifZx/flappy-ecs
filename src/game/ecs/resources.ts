@@ -6,6 +6,26 @@ export const GamePhase = {
 
 export type GamePhase = (typeof GamePhase)[keyof typeof GamePhase];
 
+export type PipeSpawnPlanEntry = {
+  id: number;
+  x: number;
+  gap: number;
+  height: number;
+};
+
+export type PipePairState = {
+  planId: number;
+  topEid: number;
+  bottomEid: number;
+  passed: boolean;
+};
+
+export type PipeRuntimeResource = {
+  activePairs: PipePairState[];
+  pendingEntries: PipeSpawnPlanEntry[];
+  reset: () => void;
+};
+
 export type GameRuntimeResource = {
   phase: GamePhase;
   reset: () => void;
@@ -29,6 +49,15 @@ const mix32 = (value: number): number => {
   mixed ^= mixed >>> 16;
   return mixed >>> 0;
 };
+
+export const createPipeRuntimeResource = (): PipeRuntimeResource => ({
+  activePairs: [],
+  pendingEntries: [],
+  reset() {
+    this.activePairs.length = 0;
+    this.pendingEntries.length = 0;
+  },
+});
 
 export const createGameRuntimeResource = (): GameRuntimeResource => {
   const maskA = randomUint32();

@@ -18,7 +18,7 @@ export type SimulationFrame = {
   phase: GamePhase;
   mark: number;
   isNight: boolean;
-  scoreDelta: number;
+  markDelta: number;
   groundScroll: number;
   birdVelocityY: number;
   guardFailed: boolean;
@@ -51,7 +51,7 @@ export const createSimulationSystem = ({
         phase: GamePhase.GameOver,
         mark: 0,
         isNight: false,
-        scoreDelta: 0,
+        markDelta: 0,
         groundScroll: 0,
         birdVelocityY: 0,
         guardFailed: true,
@@ -66,7 +66,7 @@ export const createSimulationSystem = ({
         phase: runtime.phase,
         mark,
         isNight,
-        scoreDelta: 0,
+        markDelta: 0,
         groundScroll: 0,
         birdVelocityY: 0,
         guardFailed: false,
@@ -77,15 +77,15 @@ export const createSimulationSystem = ({
     syncBirdFromPhysics({ birdQuery: context.birdQuery, physics });
 
     let nextMark = mark;
-    let scoreDelta = 0;
+    let markDelta = 0;
     let groundScroll = 0;
 
     if (runtime.phase === GamePhase.Playing) {
       const currentSpeed = getPipeSpeedByMark(mark);
-      scoreDelta = pipeDirector.update(dt, currentSpeed, mark);
+      markDelta = pipeDirector.update(dt, currentSpeed, mark);
 
-      if (scoreDelta > 0) {
-        nextMark = runtime.bump(scoreDelta);
+      if (markDelta > 0) {
+        nextMark = runtime.bump(markDelta);
       }
 
       groundScroll = getPipeSpeedByMark(nextMark) * dt;
@@ -95,7 +95,7 @@ export const createSimulationSystem = ({
       phase: runtime.phase,
       mark: nextMark,
       isNight,
-      scoreDelta,
+      markDelta,
       groundScroll,
       birdVelocityY: physics.shared.velocityY[bird.birdBody.bodyId],
       guardFailed: false,

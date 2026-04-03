@@ -67,7 +67,7 @@ export const createPresentationSystem = ({
   };
 
   const updatePlayingPresentation = (dt: number, frame: SimulationFrame): void => {
-    if (frame.scoreDelta > 0) {
+    if (frame.markDelta > 0) {
       scene.pointsText.text = String(frame.mark);
       playSound(GAME_SFX.point);
     }
