@@ -414,6 +414,34 @@ io.on('connection', (socket) => {
     emitLobbyState(room);
   });
 
+  socket.on('room:update-config', ({ roomId, durationSeconds }) => {
+    const normalizedRoomId = roomId.trim().toUpperCase();
+    const room = friendsRooms.get(normalizedRoomId);
+    if (!room) {
+      emitServerError(playerId, `Room ${normalizedRoomId} was not found.`);
+      return;
+    }
+
+    if (room.hostPlayerId !== playerId) {
+      emitServerError(playerId, 'Only the host can update this room.');
+      return;
+    }
+
+    if (room.summary.status !== 'waiting') {
+      emitServerError(playerId, 'Room settings can only be changed before the match starts.');
+      return;
+    }
+
+    room.summary.config.durationSeconds = durationSeconds;
+    debugLog('friends room updated', {
+      playerId,
+      roomId: normalizedRoomId,
+      durationSeconds,
+    });
+    io.to(normalizedRoomId).emit('room:state', room.summary);
+    emitLobbyState(room);
+  });
+
   socket.on('room:start', ({ roomId }) => {
     const normalizedRoomId = roomId.trim().toUpperCase();
     const room = friendsRooms.get(normalizedRoomId);

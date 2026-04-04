@@ -80,6 +80,11 @@ export type RoomStartRequest = {
   roomId: RoomId;
 };
 
+export type RoomConfigUpdateRequest = {
+  roomId: RoomId;
+  durationSeconds: number;
+};
+
 export type FfaJoinRequest = {
   displayName: string;
 };
@@ -131,6 +136,7 @@ export type ClientToServerEvents = {
   'room:create': (payload: RoomCreateRequest) => void;
   'room:join': (payload: RoomJoinRequest) => void;
   'room:start': (payload: RoomStartRequest) => void;
+  'room:update-config': (payload: RoomConfigUpdateRequest) => void;
   'ffa:join': (payload: FfaJoinRequest) => void;
   'system:ping': (payload: PingRequest) => void;
   'player:update': (payload: PlayerUpdateRequest) => void;

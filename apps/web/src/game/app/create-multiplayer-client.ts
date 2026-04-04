@@ -9,6 +9,7 @@ import type {
   PingRequest,
   PongPayload,
   RoomCountdown,
+  RoomConfigUpdateRequest,
   RoomCreateRequest,
   RoomLobbyState,
   RoomJoinRequest,
@@ -31,6 +32,7 @@ export type MultiplayerClient = {
   joinFfa: (payload: FfaJoinRequest) => void;
   createFriendsRoom: (payload: RoomCreateRequest) => void;
   joinFriendsRoom: (payload: RoomJoinRequest) => void;
+  updateFriendsRoomConfig: (payload: RoomConfigUpdateRequest) => void;
   startFriendsRoom: (roomId: string) => void;
   sendPlayerUpdate: (payload: PlayerUpdateRequest) => void;
   finishRun: (payload: PlayerFinishRequest) => void;
@@ -83,6 +85,9 @@ export const createMultiplayerClient = ({
     },
     joinFriendsRoom: (payload) => {
       getSocket().emit('room:join', payload);
+    },
+    updateFriendsRoomConfig: (payload) => {
+      getSocket().emit('room:update-config', payload);
     },
     startFriendsRoom: (roomId) => {
       getSocket().emit('room:start', { roomId });

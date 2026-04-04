@@ -3,6 +3,7 @@ import type { Application } from 'pixi.js';
 import QrCreator from 'qr-creator';
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/constants';
+import { UI_FONT_FAMILY } from '../config/font';
 import type { GameScene } from './create-scene';
 import type { GameRuntimeController } from './create-game-runtime';
 
@@ -70,7 +71,7 @@ const drawValueBadge = (context: CanvasRenderingContext2D, tally: number): void 
   context.strokeStyle = 'rgba(0, 0, 0, 0.42)';
   context.lineWidth = 12;
   context.lineJoin = 'round';
-  context.font = '900 64px "Segoe UI", sans-serif';
+  context.font = `900 64px ${UI_FONT_FAMILY}, monospace`;
   const valueText = String(tally);
   context.strokeText(valueText, SHARE_WIDTH * 0.5, valueY);
   context.fillText(valueText, SHARE_WIDTH * 0.5, valueY);
@@ -112,7 +113,7 @@ const drawQrCard = (context: CanvasRenderingContext2D, shareUrl: string): void =
 
   context.textAlign = 'center';
   context.fillStyle = '#101418';
-  context.font = '700 24px "Segoe UI", sans-serif';
+  context.font = `700 24px ${UI_FONT_FAMILY}, monospace`;
   context.fillText('Scan to play', cardX + cardWidth * 0.5, cardY + 218);
   context.restore();
 };

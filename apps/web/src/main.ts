@@ -6,9 +6,11 @@ import type {
   NearbyPlayersSnapshot,
   RoomSummary,
 } from '@flappy/shared';
-import { Application, Assets } from 'pixi.js';
+import { Application, Assets, Container, Graphics } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config/constants';
+import { DISPLAY_RESOLUTION } from './game/config/display';
+import { ensureUiFontLoaded } from './game/config/font';
 import { preloadSounds } from './game/audio/sound';
 import { MAX_ENTITIES } from './game/ecs/components';
 import { createGameOverActions } from './game/app/create-game-over-actions';
@@ -32,10 +34,11 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 (async () => {
   const app = new Application();
   await app.init({
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
     backgroundColor: 'black',
     antialias: true,
+    autoDensity: true,
+    resolution: DISPLAY_RESOLUTION,
+    resizeTo: window,
   });
 
   const appRoot = document.getElementById('app');
@@ -53,6 +56,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     data: { texture: atlasTexture },
   });
   const sheet = await Assets.load<Spritesheet>('game-atlas');
+  await ensureUiFontLoaded();
   await preloadSounds();
 
   const lcpPoster = document.getElementById('lcp-poster');
@@ -62,8 +66,33 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     lcpPoster.remove();
   }
 
+  const gameRoot = new Container();
+  app.stage.addChild(gameRoot);
+
+  const gameMask = new Graphics();
+  gameRoot.addChild(gameMask);
+  gameRoot.mask = gameMask;
+
+  const fitGameToViewport = (): void => {
+    const viewportWidth = app.screen.width;
+    const viewportHeight = app.screen.height;
+    const scale = Math.min(viewportWidth / GAME_WIDTH, viewportHeight / GAME_HEIGHT);
+
+    gameRoot.scale.set(scale);
+    gameRoot.position.set(
+      Math.round((viewportWidth - GAME_WIDTH * scale) / 2),
+      Math.round((viewportHeight - GAME_HEIGHT * scale) / 2),
+    );
+
+    gameMask.clear();
+    gameMask.rect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    gameMask.fill(0xffffff);
+  };
+
   const scene = createGameScene(sheet);
-  app.stage.addChild(scene.container);
+  gameRoot.addChild(scene.container);
+  fitGameToViewport();
+  window.addEventListener('resize', fitGameToViewport);
 
   const { physics, backend } = await createPhysicsBackend({
     preferredBackend: PHYSICS_BACKEND,
@@ -81,7 +110,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     layer: scene.remoteBirdLayer,
     sheet,
   });
-  const sessionPanel = createSessionPanel(rootHost);
+  const sessionPanel = createSessionPanel(gameRoot);
   const gameOverActions = createGameOverActions({
     parent: rootHost,
     onRestart: runtime.restart,
@@ -151,6 +180,10 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     multiplayer.startFriendsRoom(roomId);
   });
 
+  sessionPanel.setDurationHandler((roomId, durationSeconds) => {
+    multiplayer.updateFriendsRoomConfig({ roomId, durationSeconds });
+  });
+
   const resetToMenu = (): void => {
     gameplayEnabled = false;
     snapshotAccumulatorMs = 0;
@@ -163,7 +196,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   };
 
   const mainMenu = createMainMenu({
-    parent: app.stage,
+    parent: gameRoot,
     onOpen: resetToMenu,
     onStart: async ({ mode, displayName, roomId, durationSeconds }) => {
       activeMode = mode;

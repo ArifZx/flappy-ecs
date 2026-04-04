@@ -2,6 +2,8 @@ import { Container, Sprite, Text } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
 
 import { GAME_HEIGHT, GAME_WIDTH, GROUND_Y } from '../config/constants';
+import { DISPLAY_RESOLUTION } from '../config/display';
+import { UI_FONT_FAMILY } from '../config/font';
 import {
   createBackground,
   type BackgroundController,
@@ -41,11 +43,12 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
 
   const pointsText = new Text({
     text: '0',
+    resolution: DISPLAY_RESOLUTION,
     style: {
-      fontFamily: 'Arial',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: 36,
-      fill: 0xffffff,
-      stroke: { color: 0x000000, width: 4 },
+      fill: 0xf6efc2,
+      stroke: { color: 0x1b2530, width: 4 },
     },
   });
   pointsText.anchor.set(0.5, 0);
@@ -54,11 +57,12 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
 
   const hintText = new Text({
     text: 'Click or press Space to flap',
+    resolution: DISPLAY_RESOLUTION,
     style: {
-      fontFamily: 'Arial',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: 16,
-      fill: 0xffffff,
-      stroke: { color: 0x000000, width: 3 },
+      fill: 0xf0e7bc,
+      stroke: { color: 0x1b2530, width: 3 },
     },
   });
   hintText.anchor.set(0.5, 0.5);
