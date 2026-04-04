@@ -163,7 +163,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   };
 
   const mainMenu = createMainMenu({
-    parent: rootHost,
+    parent: app.stage,
     onOpen: resetToMenu,
     onStart: async ({ mode, displayName, roomId, durationSeconds }) => {
       activeMode = mode;
@@ -258,6 +258,12 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     const dt = Math.min(app.ticker.deltaMS / 1000, 1 / 30);
     runtime.update(dt);
     ffaPresence.update(dt, runtime.getSnapshotState().worldOffset);
+
+    if (mainMenu.isOpen()) {
+      scene.pointsText.visible = false;
+      scene.hintText.visible = false;
+      scene.gameOverSprite.visible = false;
+    }
 
     const phase = runtime.getPhase();
     if (phase !== lastPhase) {
