@@ -52,18 +52,18 @@ const MAX_FRIENDS_ROWS = 6;
 
 const floatingLabelStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 10,
+  fontSize: 8,
   fontWeight: '700',
   fill: 0x90ddf6,
-  letterSpacing: 0.16,
+  letterSpacing: 0,
 } as const;
 
 const floatingTitleStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 18,
+  fontSize: 12,
   fontWeight: '700',
   fill: 0xf8fcff,
-  stroke: { color: 0x09131b, width: 3 },
+  stroke: { color: 0x09131b, width: 2 },
 } as const;
 
 const floatingSubtitleStyle = {
@@ -75,21 +75,21 @@ const floatingSubtitleStyle = {
 
 const rowNameStyle = {
   ...bodyTextStyle,
-  fontSize: 12,
+  fontSize: 8,
   fontWeight: '700',
 } as const;
 
 const rowValueStyle = {
   ...bodyTextStyle,
-  fontSize: 11,
+  fontSize: 8,
   fontWeight: '700',
   fill: 0x9ae7ff,
 } as const;
 
 const roomCodeStyle = {
   ...dialogTitleStyle,
-  fontSize: 12,
-  letterSpacing: 0.8,
+  fontSize: 9,
+  letterSpacing: 0,
 } as const;
 
 const formatRoomMeta = (summary: RoomSummary): string => {
@@ -199,16 +199,16 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
 
   const dialogTitle = createText('Waiting Room', {
     ...dialogTitleStyle,
-    fontSize: 24,
+    fontSize: 14,
   });
   dialogTitle.position.set(0, 16);
   dialogContent.addChild(dialogTitle);
 
   const dialogSubtitle = createText('', {
     ...hintTextStyle,
-    fontSize: 12,
+    fontSize: 8,
     wordWrap: true,
-    wordWrapWidth: FRIENDS_CONTENT_WIDTH,
+    wordWrapWidth: FRIENDS_CONTENT_WIDTH - 8,
   });
   dialogSubtitle.position.set(0, 48);
   dialogContent.addChild(dialogSubtitle);
@@ -234,16 +234,16 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
 
   const durationSummary = createText('', {
     ...hintTextStyle,
-    fontSize: 12,
+    fontSize: 8,
     wordWrap: true,
-    wordWrapWidth: FRIENDS_CONTENT_WIDTH - 24,
+    wordWrapWidth: FRIENDS_CONTENT_WIDTH - 32,
   });
   durationSummary.position.set(12, 28);
   durationSection.addChild(durationSummary);
 
   const durationButtons: Array<{ seconds: number; controller: UiButtonController }> = [];
   for (const [index, seconds] of DURATION_OPTIONS.entries()) {
-    const controller = createUiButton(`${seconds}s`, 50, 34, 12, neutralButtonTheme);
+    const controller = createUiButton(`${seconds}s`, 50, 34, 8, neutralButtonTheme);
     controller.view.position.set(12 + index * 56, 72);
     durationSection.addChild(controller.view);
     durationButtons.push({ seconds, controller });
@@ -261,7 +261,7 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     friendsRows.push(row);
   }
 
-  const actionButton = createUiButton('Start Room', 176, 40, 14, primaryButtonTheme);
+  const actionButton = createUiButton('Start Room', 176, 40, 9, primaryButtonTheme);
   actionButton.view.position.set((FRIENDS_CONTENT_WIDTH - 176) / 2, 286 + MAX_FRIENDS_ROWS * (FRIENDS_ROW_HEIGHT + 6));
   dialogContent.addChild(actionButton.view);
 

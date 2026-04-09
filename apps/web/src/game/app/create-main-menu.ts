@@ -79,10 +79,10 @@ export const createMainMenu = ({
     resolution: DISPLAY_RESOLUTION,
     style: {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: 34,
+      fontSize: 20,
       fontWeight: '700',
       fill: 0xf6efc2,
-      stroke: { color: 0x1b2530, width: 5 },
+      stroke: { color: 0x1b2530, width: 3 },
     },
   });
   title.anchor.set(0.5, 0);
@@ -106,14 +106,14 @@ export const createMainMenu = ({
   menuButtons.position.set(14, 84);
   panel.addChild(menuButtons);
 
-  const playButton = createUiButton('Play', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 20, primaryButtonTheme);
+  const playButton = createUiButton('Play', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 12, primaryButtonTheme);
   menuButtons.addChild(playButton.view);
 
-  const optionsButton = createUiButton('Options', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 18, neutralButtonTheme);
+  const optionsButton = createUiButton('Options', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 10, neutralButtonTheme);
   optionsButton.view.position.set(0, PRIMARY_BUTTON_HEIGHT + 10);
   menuButtons.addChild(optionsButton.view);
 
-  const creditsButton = createUiButton('Credits', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 18, neutralButtonTheme);
+  const creditsButton = createUiButton('Credits', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 10, neutralButtonTheme);
   creditsButton.view.position.set(0, (PRIMARY_BUTTON_HEIGHT + 10) * 2);
   menuButtons.addChild(creditsButton.view);
 
@@ -149,7 +149,7 @@ export const createMainMenu = ({
     style: {
       ...bodyTextStyle,
       wordWrap: true,
-      wordWrapWidth: CONTROL_WIDTH,
+      wordWrapWidth: CONTROL_WIDTH - 8,
     },
   });
   dialogDescription.position.set(0, 0);
@@ -181,15 +181,15 @@ export const createMainMenu = ({
     style: {
       ...hintTextStyle,
       wordWrap: true,
-      wordWrapWidth: CONTROL_WIDTH,
+      wordWrapWidth: CONTROL_WIDTH - 8,
     },
   });
   roomHint.position.set(0, 232);
   playMenuContent.addChild(roomHint);
 
-  const playCancelButton = createUiButton('Cancel', 88, 36, 13, neutralButtonTheme);
+  const playCancelButton = createUiButton('Cancel', 88, 36, 9, neutralButtonTheme);
   playCancelButton.view.position.set(0, 314);
-  const playConfirmButton = createUiButton('Continue', 110, 36, 13, primaryButtonTheme);
+  const playConfirmButton = createUiButton('Continue', 110, 36, 9, primaryButtonTheme);
   playConfirmButton.view.position.set(CONTROL_WIDTH - 110, 314);
   playMenuContent.addChild(playCancelButton.view, playConfirmButton.view);
 

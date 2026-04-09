@@ -42,7 +42,7 @@ export const createPresentationSystem = ({
     bobTimer = 0;
     birdSprite.rotation = 0;
     scene.pointsText.text = '0';
-    scene.hintText.text = 'Click or press Space to flap';
+    scene.hintText.text = 'Click\nor\npress Space\nto flap';
     scene.hintText.visible = true;
     scene.gameOverSprite.visible = false;
     scene.background.reset();

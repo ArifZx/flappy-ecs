@@ -46,7 +46,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
     resolution: DISPLAY_RESOLUTION,
     style: {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: 36,
+      fontSize: 22,
       fill: 0xf6efc2,
       stroke: { color: 0x1b2530, width: 4 },
     },
@@ -56,11 +56,12 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
   container.addChild(pointsText);
 
   const hintText = new Text({
-    text: 'Click or press Space to flap',
+    text: 'Click or press Space\nto flap',
     resolution: DISPLAY_RESOLUTION,
     style: {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: 16,
+      fontSize: 9,
+      align: 'center',
       fill: 0xf0e7bc,
       stroke: { color: 0x1b2530, width: 3 },
     },

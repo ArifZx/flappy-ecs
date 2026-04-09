@@ -47,56 +47,57 @@ export const MODE_BUTTON_SPACING = 5;
 export const DURATION_OPTIONS = [45, 60, 90, 120] as const;
 
 export const MODE_CONFIGS: Array<{ mode: GameMode; label: string; fontSize: number }> = [
-  { mode: 'offline', label: 'Solo', fontSize: 13 },
-  { mode: 'free-for-all', label: 'Arena', fontSize: 12 },
-  { mode: 'friends', label: 'Party', fontSize: 12 },
+  { mode: 'offline', label: 'Solo', fontSize: 9 },
+  { mode: 'free-for-all', label: 'Arena', fontSize: 8 },
+  { mode: 'friends', label: 'Party', fontSize: 8 },
 ];
 
 const sectionTextStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 12,
+  fontSize: 9,
   fontWeight: '700',
   fill: 0xf2e8b6,
-  letterSpacing: 0.4,
+  letterSpacing: 0,
 } as const;
 
 const inputTextStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 16,
+  fontSize: 11,
   fontWeight: '700',
   fill: 0xf4efcf,
 } as const;
 
 export const bodyTextStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 11,
+  fontSize: 8,
   fill: 0xece7c9,
-  stroke: { color: 0x10202b, width: 2 },
+  stroke: { color: 0x10202b, width: 1 },
 } as const;
 
 export const hintTextStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 11,
+  fontSize: 8,
   fill: 0xb8d4d8,
-  stroke: { color: 0x10202b, width: 2 },
+  align: 'center',
+  stroke: { color: 0x10202b, width: 1 },
 } as const;
 
 export const dialogTitleStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 14,
+  fontSize: 10,
   fontWeight: '700',
   fill: 0xf7ecae,
-  stroke: { color: 0x10202b, width: 2 },
+  stroke: { color: 0x10202b, width: 1 },
 } as const;
 
 export const statusTextStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 12,
+  fontSize: 9,
   fill: 0xffefb3,
   align: 'center',
   wordWrap: true,
   wordWrapWidth: GAME_WIDTH - 36,
-  stroke: { color: 0x1a1f22, width: 3 },
+  stroke: { color: 0x1a1f22, width: 2 },
 } as const;
 
 export const neutralButtonTheme: ButtonThemeSet = {
@@ -171,7 +172,7 @@ const createButtonView = (
   return background;
 };
 
-const createButtonLabel = (text: string, fontSize: number, fill: number): Text => {
+const createButtonLabel = (text: string, fontSize: number, fill: number, wrapWidth: number): Text => {
   const label = new Text({
     text,
     resolution: DISPLAY_RESOLUTION,
@@ -180,6 +181,10 @@ const createButtonLabel = (text: string, fontSize: number, fill: number): Text =
       fontSize,
       fontWeight: '700',
       fill,
+      align: 'center',
+      wordWrap: true,
+      wordWrapWidth: wrapWidth,
+      breakWords: true,
       stroke: { color: 0x1a2f3e, width: 2 },
     },
   });
@@ -194,7 +199,7 @@ export const createUiButton = (
   fontSize: number,
   themeSet: ButtonThemeSet,
 ): UiButtonController => {
-  const textView = createButtonLabel(label, fontSize, themeSet.idle.textColor);
+  const textView = createButtonLabel(label, fontSize, themeSet.idle.textColor, Math.max(24, width - 18));
   const button = new FancyButton({
     defaultView: createButtonView(width, height, 18, themeSet.idle),
     hoverView: createButtonView(width, height, 18, themeSet.hover),
@@ -259,7 +264,7 @@ export const createMenuInput = (value: string, placeholder: string, maxLength: n
     placeholder,
     maxLength,
     addMask: true,
-    padding: { top: 10, right: 12, bottom: 10, left: 12 },
+    padding: { top: 13, right: 12, bottom: 9, left: 12 },
     textStyle: inputTextStyle,
   });
   input.width = CONTROL_WIDTH;
