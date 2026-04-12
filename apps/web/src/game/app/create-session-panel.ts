@@ -40,6 +40,12 @@ type ListRowController = {
   value: Text;
 };
 
+type ListRowOptions = {
+  fillAlpha?: number;
+  strokeAlpha?: number;
+  backgroundAlpha?: number;
+};
+
 const FFA_PANEL_WIDTH = 136;
 const FFA_PANEL_ROW_HEIGHT = 22;
 const FRIENDS_DIALOG_WIDTH = GAME_WIDTH - 20;
@@ -100,14 +106,16 @@ const formatRoomMeta = (summary: RoomSummary): string => {
 const createText = (text: string, style: object): Text =>
   new Text({ text, style, resolution: DISPLAY_RESOLUTION });
 
-const createListRow = (width: number, height: number): ListRowController => {
+const createListRow = (width: number, height: number, options: ListRowOptions = {}): ListRowController => {
+  const { fillAlpha = 0.05, strokeAlpha = 0.04, backgroundAlpha = 0.45 } = options;
   const container = new Container();
   const background = new Graphics();
-  drawRoundedRect(background, width, height, 14, 0xffffff, 0.05, {
+  drawRoundedRect(background, width, height, 14, 0xffffff, fillAlpha, {
     color: 0xffffff,
     width: 1,
-    alpha: 0.08,
+    alpha: strokeAlpha,
   });
+  background.alpha = backgroundAlpha;
   container.addChild(background);
 
   const name = createText('', rowNameStyle);
@@ -185,7 +193,11 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
 
   const floatingRows: ListRowController[] = [];
   for (let index = 0; index < MAX_FFA_ROWS; index += 1) {
-    const row = createListRow(FFA_PANEL_WIDTH - 16, FFA_PANEL_ROW_HEIGHT);
+    const row = createListRow(FFA_PANEL_WIDTH - 16, FFA_PANEL_ROW_HEIGHT, {
+      fillAlpha: 0,
+      strokeAlpha: 0,
+      backgroundAlpha: 0,
+    });
     row.container.position.set(8, 102 + index * (FFA_PANEL_ROW_HEIGHT + 4));
     floatingPanel.addChild(row.container);
     floatingRows.push(row);
@@ -367,10 +379,10 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
 
       root.visible = true;
       floatingPanel.visible = true;
-      drawRoundedRect(floatingBackground, FFA_PANEL_WIDTH, 348, 22, 0x0c1822, 0.88, {
+      drawRoundedRect(floatingBackground, FFA_PANEL_WIDTH, 348, 22, 0x0c1822, 0, {
         color: 0xffffff,
         width: 2,
-        alpha: 0.12,
+        alpha: 0,
       });
       floatingSubtitle.text = formatRoomMeta(summary);
       floatingScoreTitle.text = `MAX SCORE ${payload?.maxScore ?? 0}`;

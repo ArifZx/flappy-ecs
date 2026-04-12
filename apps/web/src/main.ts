@@ -120,6 +120,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   let latestFfaState: RoomSummary | null = null;
   let latestLeaderboard: LeaderboardUpdate | null = null;
   let currentDisplayName = 'Player';
+  let activeFriendsRoomId: string | null = null;
   let snapshotAccumulatorMs = 0;
   let finishReported = false;
 
@@ -142,6 +143,8 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
         return;
       }
 
+      activeFriendsRoomId = summary.roomId;
+
       if (summary.status === 'running') {
         gameplayEnabled = true;
         runtime.restart();
@@ -150,6 +153,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     },
     onLobbyState: (state) => {
       if (activeMode === 'friends') {
+        activeFriendsRoomId = state.room.roomId;
         gameplayEnabled = false;
         sessionPanel.showFriendsLobby(state);
         mainMenu.close();
@@ -162,6 +166,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     },
     onCountdown: (payload) => {
       if (activeMode === 'friends') {
+        activeFriendsRoomId = payload.roomId;
         sessionPanel.showCountdown(payload);
       }
     },
@@ -177,15 +182,19 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   });
 
   sessionPanel.setStartHandler((roomId) => {
-    multiplayer.startFriendsRoom(roomId);
+    multiplayer.startFriendsRoom(activeFriendsRoomId ?? roomId);
   });
 
   sessionPanel.setDurationHandler((roomId, durationSeconds) => {
-    multiplayer.updateFriendsRoomConfig({ roomId, durationSeconds });
+    multiplayer.updateFriendsRoomConfig({
+      roomId: activeFriendsRoomId ?? roomId,
+      durationSeconds,
+    });
   });
 
   const resetToMenu = (): void => {
     gameplayEnabled = false;
+    activeFriendsRoomId = null;
     snapshotAccumulatorMs = 0;
     finishReported = false;
     runtime.restart();
@@ -203,6 +212,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       currentDisplayName = displayName.trim() || 'Player';
       latestFfaState = null;
       latestLeaderboard = null;
+      activeFriendsRoomId = mode === 'friends' ? roomId || null : null;
       ffaPresence.clear();
 
       if (mode === 'free-for-all') {

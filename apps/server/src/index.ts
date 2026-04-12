@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
+import type { ServerResponse } from 'node:http';
 import { Server } from 'socket.io';
 import type {
   BirdVariant,
@@ -23,6 +24,17 @@ const MAX_VISIBLE_PLAYERS = 20;
 const FFA_DEFAULT_BIRD_X = 78;
 const FFA_DEFAULT_BIRD_Y = 220;
 const MULTIPLAYER_DEBUG = process.env.MULTIPLAYER_DEBUG !== '0';
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://flappy.arifz.com',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+];
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS ?? DEFAULT_ALLOWED_ORIGINS.join(','))
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
 
 type SessionAssignment = {
   mode: 'free-for-all' | 'friends';
@@ -50,29 +62,18 @@ type FriendsRoomRecord = {
   hostPlayerId: PlayerId;
   players: Map<PlayerId, ConnectedPlayer>;
   summary: RoomSummary;
+  createdAt: number;
   countdownTimer: ReturnType<typeof setTimeout> | null;
 };
 
 type FfaRoomRecord = {
   summary: RoomSummary;
   players: Map<PlayerId, ConnectedPlayer>;
+  createdAt: number;
+  lastPlayerDisconnectedAt: number | null;
+  idleShutdownAt: number | null;
   idleTimer: ReturnType<typeof setTimeout> | null;
 };
-
-const httpServer = createServer((_request, response) => {
-  response.writeHead(200, { 'content-type': 'application/json' });
-  response.end(JSON.stringify({
-    service: 'flappy-server',
-    status: 'ok',
-    message: 'Multiplayer scaffold is ready for incremental implementation.',
-  }));
-});
-
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
-  cors: {
-    origin: '*',
-  },
-});
 
 const friendsRooms = new Map<RoomId, FriendsRoomRecord>();
 
@@ -94,10 +95,136 @@ const createEmptyFfaRoom = (): FfaRoomRecord => ({
     connectedCount: 0,
   },
   players: new Map(),
+  createdAt: Date.now(),
+  lastPlayerDisconnectedAt: null,
+  idleShutdownAt: null,
   idleTimer: null,
 });
 
 let ffaRoom = createEmptyFfaRoom();
+
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) {
+    return true;
+  }
+
+  return ALLOWED_ORIGINS.includes(origin);
+};
+
+const applyCorsHeaders = (requestOrigin: string | undefined, response: ServerResponse): void => {
+  response.setHeader('Vary', 'Origin');
+  if (!requestOrigin || !isAllowedOrigin(requestOrigin)) {
+    return;
+  }
+
+  response.setHeader('Access-Control-Allow-Origin', requestOrigin);
+  response.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+};
+
+const buildMonitorSnapshot = () => {
+  const now = Date.now();
+  const includeFfaRoom = ffaRoom.players.size > 0 || ffaRoom.idleTimer !== null;
+  const friendsRoomDetails = [...friendsRooms.values()]
+    .sort((left, right) => left.roomId.localeCompare(right.roomId))
+    .map((room) => ({
+      roomId: room.roomId,
+      mode: room.summary.config.mode,
+      status: room.summary.status,
+      playerCount: room.players.size,
+      hostPlayerId: room.hostPlayerId,
+      createdAt: room.createdAt,
+      createdAtIso: new Date(room.createdAt).toISOString(),
+      uptimeMs: now - room.createdAt,
+      uptimeSeconds: Math.floor((now - room.createdAt) / 1000),
+      durationSeconds: room.summary.config.durationSeconds,
+      countdownSeconds: room.summary.config.countdownSeconds,
+    }));
+
+  const friendsPlayerCount = friendsRoomDetails.reduce((total, room) => total + room.playerCount, 0);
+
+  const ffaRoomDetails = includeFfaRoom
+    ? [{
+        roomId: ffaRoom.summary.roomId,
+        mode: ffaRoom.summary.config.mode,
+        status: ffaRoom.players.size > 0 ? ffaRoom.summary.status : 'idle',
+        playerCount: ffaRoom.players.size,
+        createdAt: ffaRoom.createdAt,
+        createdAtIso: new Date(ffaRoom.createdAt).toISOString(),
+        uptimeMs: now - ffaRoom.createdAt,
+        uptimeSeconds: Math.floor((now - ffaRoom.createdAt) / 1000),
+        lastPlayerDisconnectedAt: ffaRoom.lastPlayerDisconnectedAt,
+        lastPlayerDisconnectedAtIso:
+          ffaRoom.lastPlayerDisconnectedAt === null
+            ? null
+            : new Date(ffaRoom.lastPlayerDisconnectedAt).toISOString(),
+        idleShutdownAt: ffaRoom.idleShutdownAt,
+        idleShutdownAtIso:
+          ffaRoom.idleShutdownAt === null ? null : new Date(ffaRoom.idleShutdownAt).toISOString(),
+        secondsUntilShutdown:
+          ffaRoom.idleShutdownAt === null ? null : Math.max(0, Math.ceil((ffaRoom.idleShutdownAt - now) / 1000)),
+        durationSeconds: ffaRoom.summary.config.durationSeconds,
+        countdownSeconds: ffaRoom.summary.config.countdownSeconds,
+      }]
+    : [];
+
+  return {
+    service: 'flappy-server',
+    status: 'ok',
+    rooms: {
+      total: ffaRoomDetails.length + friendsRoomDetails.length,
+      freeForAll: ffaRoomDetails.length,
+      friends: friendsRoomDetails.length,
+    },
+    players: {
+      total: ffaRoom.players.size + friendsPlayerCount,
+      freeForAll: ffaRoom.players.size,
+      friends: friendsPlayerCount,
+    },
+    roomDetails: [
+      ...ffaRoomDetails,
+      ...friendsRoomDetails,
+    ],
+  };
+};
+
+const httpServer = createServer((request, response) => {
+  const requestUrl = new URL(request.url ?? '/', `http://${request.headers.host ?? `localhost:${port}`}`);
+  const requestOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
+
+  applyCorsHeaders(requestOrigin, response);
+
+  if (request.method === 'OPTIONS') {
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  if (requestUrl.pathname === '/monitor') {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(buildMonitorSnapshot(), null, 2));
+    return;
+  }
+
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({
+    service: 'flappy-server',
+    status: 'ok',
+    message: 'Multiplayer scaffold is ready for incremental implementation.',
+  }));
+});
+
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+  cors: {
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin ?? undefined)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Socket origin not allowed: ${origin ?? 'unknown'}`));
+    },
+  },
+});
 
 const debugLog = (message: string, details?: Record<string, unknown>): void => {
   if (!MULTIPLAYER_DEBUG) {
@@ -195,17 +322,24 @@ const clearFfaIdleTimer = (): void => {
 
   clearTimeout(ffaRoom.idleTimer);
   ffaRoom.idleTimer = null;
+  ffaRoom.idleShutdownAt = null;
 };
 
 const scheduleFfaIdleShutdown = (): void => {
   clearFfaIdleTimer();
   if (ffaRoom.players.size > 0) {
+    ffaRoom.lastPlayerDisconnectedAt = null;
     return;
   }
+
+  ffaRoom.lastPlayerDisconnectedAt = Date.now();
+  ffaRoom.idleShutdownAt = ffaRoom.lastPlayerDisconnectedAt + FFA_IDLE_TIMEOUT_MS;
 
   ffaRoom.idleTimer = setTimeout(() => {
     if (ffaRoom.players.size > 0) {
       ffaRoom.idleTimer = null;
+      ffaRoom.idleShutdownAt = null;
+      ffaRoom.lastPlayerDisconnectedAt = null;
       return;
     }
 
@@ -259,12 +393,6 @@ const assignSocketSession = (playerId: PlayerId, assignment: SessionAssignment |
   socket.data.assignment = assignment;
 };
 
-const getSocketSession = (playerId: PlayerId): SessionAssignment | null => {
-  const socket = io.sockets.sockets.get(playerId);
-  const assignment = socket?.data.assignment;
-  return assignment ? (assignment as SessionAssignment) : null;
-};
-
 io.on('connection', (socket) => {
   const playerId = socket.id;
 
@@ -284,6 +412,7 @@ io.on('connection', (socket) => {
 
   socket.on('ffa:join', ({ displayName }) => {
     clearFfaIdleTimer();
+    ffaRoom.lastPlayerDisconnectedAt = null;
 
     const existing = ffaRoom.players.get(playerId);
     const player: ConnectedPlayer = {
@@ -351,6 +480,7 @@ io.on('connection', (socket) => {
         },
         connectedCount: 1,
       },
+      createdAt: Date.now(),
       countdownTimer: null,
     };
 
@@ -543,7 +673,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const assignment = getSocketSession(playerId);
+    const assignment = socket.data.assignment
+      ? (socket.data.assignment as SessionAssignment)
+      : null;
     debugLog('socket disconnected', {
       playerId,
       mode: assignment?.mode ?? null,

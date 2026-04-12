@@ -10,6 +10,7 @@ Repository: https://github.com/ArifZx/flappy-ecs
 
 - `docs/architecture.md`: broader project architecture notes
 - `docs/ffa-integration.md`: focused FFA multiplayer notes and implementation rules
+- `docs/server.md`: current multiplayer server behavior, event flow, and implementation limits
 
 ## Workspace Layout
 
@@ -31,6 +32,7 @@ Environment config:
 Available variables:
 
 - `PORT` defaults to `3001`
+- `CORS_ORIGINS` defaults to `https://flappy.arifz.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173`
 - `VITE_SERVER_URL` defaults to `http://localhost:3001`
 
 ```bash
