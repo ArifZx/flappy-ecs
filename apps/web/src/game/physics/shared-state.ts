@@ -3,15 +3,17 @@ export const PHYSICS_META_CAPACITY_INDEX = 1;
 export const PHYSICS_META_STEP_INDEX = 2;
 export const PHYSICS_META_LENGTH = 3;
 
+export type PhysicsSharedBuffer = SharedArrayBuffer | ArrayBuffer;
+
 export type PhysicsSharedBuffers = {
-  meta: SharedArrayBuffer;
-  active: SharedArrayBuffer;
-  entityIds: SharedArrayBuffer;
-  x: SharedArrayBuffer;
-  y: SharedArrayBuffer;
-  angle: SharedArrayBuffer;
-  velocityX: SharedArrayBuffer;
-  velocityY: SharedArrayBuffer;
+  meta: PhysicsSharedBuffer;
+  active: PhysicsSharedBuffer;
+  entityIds: PhysicsSharedBuffer;
+  x: PhysicsSharedBuffer;
+  y: PhysicsSharedBuffer;
+  angle: PhysicsSharedBuffer;
+  velocityX: PhysicsSharedBuffer;
+  velocityY: PhysicsSharedBuffer;
 };
 
 export type PhysicsSharedViews = {
@@ -25,16 +27,29 @@ export type PhysicsSharedViews = {
   velocityY: Float32Array;
 };
 
-export const createPhysicsSharedBuffers = (capacity: number): PhysicsSharedBuffers => ({
-  meta: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * PHYSICS_META_LENGTH),
-  active: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * capacity),
-  entityIds: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * capacity),
-  x: new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
-  y: new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
-  angle: new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
-  velocityX: new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
-  velocityY: new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
-});
+export const createPhysicsSharedBuffers = (
+  capacity: number,
+  useSharedArrayBuffer = true,
+): PhysicsSharedBuffers => {
+  const createBuffer = (byteLength: number): PhysicsSharedBuffer => {
+    if (useSharedArrayBuffer && typeof SharedArrayBuffer !== 'undefined') {
+      return new SharedArrayBuffer(byteLength);
+    }
+
+    return new ArrayBuffer(byteLength);
+  };
+
+  return {
+    meta: createBuffer(Int32Array.BYTES_PER_ELEMENT * PHYSICS_META_LENGTH),
+    active: createBuffer(Int32Array.BYTES_PER_ELEMENT * capacity),
+    entityIds: createBuffer(Int32Array.BYTES_PER_ELEMENT * capacity),
+    x: createBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
+    y: createBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
+    angle: createBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
+    velocityX: createBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
+    velocityY: createBuffer(Float32Array.BYTES_PER_ELEMENT * capacity),
+  };
+};
 
 export const createPhysicsSharedViews = (
   buffers: PhysicsSharedBuffers,
@@ -51,7 +66,7 @@ export const createPhysicsSharedViews = (
     velocityY: new Float32Array(buffers.velocityY),
   };
 
-  Atomics.store(views.meta, PHYSICS_META_CAPACITY_INDEX, capacity);
+  views.meta[PHYSICS_META_CAPACITY_INDEX] = capacity;
 
   return views;
 };

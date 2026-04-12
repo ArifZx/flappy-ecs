@@ -26,7 +26,7 @@ export class MainThreadPhysicsAdapter implements PhysicsAdapter {
   private nextBodyId = 1;
 
   constructor(options: MainThreadAdapterOptions) {
-    const buffers = createPhysicsSharedBuffers(options.capacity);
+    const buffers = createPhysicsSharedBuffers(options.capacity, false);
     this.shared = createPhysicsSharedViews(buffers, options.capacity);
     this.world = new World(new Vec2(options.gravity.x, options.gravity.y));
 
@@ -145,8 +145,8 @@ export class MainThreadPhysicsAdapter implements PhysicsAdapter {
       this.writeBodyState(bodyId, body, body.getUserData() as PhysicsBodyUserData | undefined);
     }
 
-    Atomics.add(this.shared.meta, PHYSICS_META_VERSION_INDEX, 1);
-    Atomics.add(this.shared.meta, PHYSICS_META_STEP_INDEX, 1);
+    this.shared.meta[PHYSICS_META_VERSION_INDEX] += 1;
+    this.shared.meta[PHYSICS_META_STEP_INDEX] += 1;
   }
 
   onContact(listener: PhysicsContactListener): () => void {

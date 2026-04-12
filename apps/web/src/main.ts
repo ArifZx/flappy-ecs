@@ -54,7 +54,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 
   const atlasTexture = await Assets.load('sprites/game.png');
   const diceTexture = await Assets.load<Texture>({
-    src: '/dice.svg',
+    src: 'dice.svg',
     data: { resolution: 2 },
   });
   Assets.add({

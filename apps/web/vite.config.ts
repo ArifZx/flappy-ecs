@@ -6,6 +6,7 @@ const sharedArrayBufferHeaders = {
 };
 
 export default defineConfig({
+  base: './',
   server: {
     headers: sharedArrayBufferHeaders,
   },
