@@ -36,6 +36,8 @@ export type FriendsRoomRecord = {
   createdAt: number;
   countdownTimer: ReturnType<typeof setTimeout> | null;
   finishTimer: ReturnType<typeof setTimeout> | null;
+  nearbyPlayersTimer: ReturnType<typeof setTimeout> | null;
+  lastNearbyPlayersBroadcastAt: number;
 };
 
 export type FfaRoomRecord = {

@@ -51,6 +51,8 @@ export type FriendsRoomService = {
   buildMonitorDetails: (now: number) => MonitorRoomDetail[];
 };
 
+const FRIENDS_NEARBY_PLAYERS_INTERVAL_MS = 50;
+
 export const createFriendsRoomService = ({
   io,
   debugLog,
@@ -106,9 +108,37 @@ export const createFriendsRoomService = ({
   });
 
   const emitNearbyPlayers = (room: FriendsRoomRecord): void => {
+    room.lastNearbyPlayersBroadcastAt = Date.now();
     for (const playerId of room.players.keys()) {
       io.to(playerId).emit('players:nearby', buildNearbyPlayersSnapshot(room, playerId));
     }
+  };
+
+  const clearNearbyPlayersTimer = (room: FriendsRoomRecord): void => {
+    if (room.nearbyPlayersTimer === null) {
+      return;
+    }
+
+    clearTimeout(room.nearbyPlayersTimer);
+    room.nearbyPlayersTimer = null;
+  };
+
+  const emitNearbyPlayersThrottled = (room: FriendsRoomRecord): void => {
+    const elapsedMs = Date.now() - room.lastNearbyPlayersBroadcastAt;
+    if (elapsedMs >= FRIENDS_NEARBY_PLAYERS_INTERVAL_MS) {
+      clearNearbyPlayersTimer(room);
+      emitNearbyPlayers(room);
+      return;
+    }
+
+    if (room.nearbyPlayersTimer !== null) {
+      return;
+    }
+
+    room.nearbyPlayersTimer = setTimeout(() => {
+      room.nearbyPlayersTimer = null;
+      emitNearbyPlayers(room);
+    }, FRIENDS_NEARBY_PLAYERS_INTERVAL_MS - elapsedMs);
   };
 
   const buildLeaderboard = (room: FriendsRoomRecord): LeaderboardEntry[] =>
@@ -137,6 +167,8 @@ export const createFriendsRoomService = ({
     if (room.finishTimer !== null) {
       clearTimeout(room.finishTimer);
     }
+
+    clearNearbyPlayersTimer(room);
 
     friendsRooms.delete(roomId);
   };
@@ -189,6 +221,8 @@ export const createFriendsRoomService = ({
         createdAt: Date.now(),
         countdownTimer: null,
         finishTimer: null,
+        nearbyPlayersTimer: null,
+        lastNearbyPlayersBroadcastAt: 0,
       };
 
       friendsRooms.set(roomId, room);
@@ -297,6 +331,7 @@ export const createFriendsRoomService = ({
         liveRoom.countdownTimer = null;
         liveRoom.summary.status = 'running';
         io.to(normalizedRoomId).emit('room:state', liveRoom.summary);
+        clearNearbyPlayersTimer(liveRoom);
         emitNearbyPlayers(liveRoom);
         emitLobbyState(liveRoom);
 
@@ -353,6 +388,7 @@ export const createFriendsRoomService = ({
       });
 
       emitLobbyState(room);
+      clearNearbyPlayersTimer(room);
       emitNearbyPlayers(room);
       debugLog('player kicked from friends room', {
         playerId,
@@ -395,7 +431,7 @@ export const createFriendsRoomService = ({
         player.finishedAt = Date.now();
       }
 
-      emitNearbyPlayers(room);
+      emitNearbyPlayersThrottled(room);
       return null;
     },
     handlePlayerFinish: (playerId, roomId, progress, score, scoreTrigger) => {
@@ -433,6 +469,7 @@ export const createFriendsRoomService = ({
       player.alive = false;
       player.finished = true;
       player.finishedAt = Date.now();
+      clearNearbyPlayersTimer(room);
       emitNearbyPlayers(room);
       return null;
     },
@@ -451,6 +488,7 @@ export const createFriendsRoomService = ({
       }
 
       emitLobbyState(room);
+      clearNearbyPlayersTimer(room);
       emitNearbyPlayers(room);
       debugLog('player left friends room', {
         playerId,
