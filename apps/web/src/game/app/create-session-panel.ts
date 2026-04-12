@@ -1,4 +1,3 @@
-import { Dialog } from '@pixi/ui';
 import { Container, Graphics, Text } from 'pixi.js';
 import type {
   LeaderboardEntry,
@@ -53,8 +52,12 @@ const FRIENDS_DIALOG_HEIGHT = GAME_HEIGHT - 56;
 const FRIENDS_CONTENT_WIDTH = FRIENDS_DIALOG_WIDTH - 28;
 const FRIENDS_ROW_WIDTH = FRIENDS_CONTENT_WIDTH;
 const FRIENDS_ROW_HEIGHT = 28;
+const FRIENDS_ROW_GAP = 4;
+const FRIENDS_LIST_TITLE_Y = 258;
+const FRIENDS_LIST_START_Y = 278;
+const FRIENDS_ACTION_BUTTON_Y = 384;
 const MAX_FFA_ROWS = 10;
-const MAX_FRIENDS_ROWS = 6;
+const MAX_FRIENDS_ROWS = 3;
 
 const floatingLabelStyle = {
   fontFamily: UI_FONT_FAMILY,
@@ -204,6 +207,7 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
   }
 
   const dialogContent = new Container();
+  dialogContent.position.set(14, 14);
 
   const dialogBadge = createText('Party', floatingLabelStyle);
   dialogBadge.position.set(0, 0);
@@ -262,19 +266,19 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
   }
 
   const listTitle = createText('PLAYERS IN ROOM', floatingLabelStyle);
-  listTitle.position.set(0, 266);
+  listTitle.position.set(0, FRIENDS_LIST_TITLE_Y);
   dialogContent.addChild(listTitle);
 
   const friendsRows: ListRowController[] = [];
   for (let index = 0; index < MAX_FRIENDS_ROWS; index += 1) {
     const row = createListRow(FRIENDS_ROW_WIDTH, FRIENDS_ROW_HEIGHT);
-    row.container.position.set(0, 286 + index * (FRIENDS_ROW_HEIGHT + 6));
+    row.container.position.set(0, FRIENDS_LIST_START_Y + index * (FRIENDS_ROW_HEIGHT + FRIENDS_ROW_GAP));
     dialogContent.addChild(row.container);
     friendsRows.push(row);
   }
 
-  const actionButton = createUiButton('Start Room', 176, 40, 9, primaryButtonTheme);
-  actionButton.view.position.set((FRIENDS_CONTENT_WIDTH - 176) / 2, 286 + MAX_FRIENDS_ROWS * (FRIENDS_ROW_HEIGHT + 6));
+  const actionButton = createUiButton('Start Party Game', 176, 40, 9, primaryButtonTheme);
+  actionButton.view.position.set((FRIENDS_CONTENT_WIDTH - 176) / 2, FRIENDS_ACTION_BUTTON_Y);
   dialogContent.addChild(actionButton.view);
 
   const dialogBackground = new Graphics();
@@ -284,28 +288,16 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     alpha: 0.16,
   });
 
-  const friendsDialog = new Dialog({
-    background: dialogBackground,
-    content: dialogContent,
-    width: FRIENDS_DIALOG_WIDTH,
-    height: FRIENDS_DIALOG_HEIGHT,
-    padding: 14,
-    backdropColor: 0x000000,
-    backdropAlpha: 0.42,
-    closeOnBackdropClick: false,
-    animations: {
-      open: {
-        props: { scale: { x: 1, y: 1 }, alpha: 1 },
-        duration: 120,
-      },
-      close: {
-        props: { scale: { x: 0.96, y: 0.96 }, alpha: 0 },
-        duration: 100,
-      },
-    },
-  });
-  friendsDialog.scale.set(0.96);
-  friendsDialog.alpha = 0;
+  const dialogBackdrop = new Graphics();
+  dialogBackdrop.visible = false;
+  dialogBackdrop.rect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  dialogBackdrop.fill({ color: 0x000000, alpha: 0.42 });
+  root.addChild(dialogBackdrop);
+
+  const friendsDialog = new Container();
+  friendsDialog.visible = false;
+  friendsDialog.position.set((GAME_WIDTH - FRIENDS_DIALOG_WIDTH) / 2, 28);
+  friendsDialog.addChild(dialogBackground, dialogContent);
   root.addChild(friendsDialog);
 
   let startHandler: ((roomId: string) => void) | null = null;
@@ -316,17 +308,15 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
   const openDialog = (): void => {
     root.visible = true;
     floatingPanel.visible = false;
-    if (!friendsDialog.isOpen) {
-      friendsDialog.open();
-    }
+    dialogBackdrop.visible = true;
+    friendsDialog.visible = true;
   };
 
   const hide = (): void => {
     root.visible = false;
     floatingPanel.visible = false;
-    if (friendsDialog.isOpen) {
-      friendsDialog.close();
-    }
+    dialogBackdrop.visible = false;
+    friendsDialog.visible = false;
   };
 
   const syncDurationButtons = (selectedDuration: number, enabled: boolean): void => {
@@ -373,9 +363,8 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
       hide();
     },
     showFfa: (summary, payload) => {
-      if (friendsDialog.isOpen) {
-        friendsDialog.close();
-      }
+      dialogBackdrop.visible = false;
+      friendsDialog.visible = false;
 
       root.visible = true;
       floatingPanel.visible = true;
