@@ -67,6 +67,7 @@ export const createGameOverActions = ({
         const shareData = {
           title: 'FLAPPY PARTY!',
           text: 'Come flap with me in FLAPPY PARTY!',
+          url: 'https://flappy.arifz.com',
           files: [shareFile],
         };
 
