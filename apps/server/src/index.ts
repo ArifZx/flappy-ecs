@@ -20,6 +20,7 @@ const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const MULTIPLAYER_DEBUG = process.env.MULTIPLAYER_DEBUG !== '0';
 
 const isAllowedOrigin = (origin: string | undefined): boolean => {
+  console.log('Checking socket origin', { origin });
   if (!origin) {
     return true;
   }
