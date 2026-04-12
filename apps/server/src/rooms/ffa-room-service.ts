@@ -4,6 +4,7 @@ import type {
   NearbyPlayersSnapshot,
   PlayerId,
   PlayerSnapshot,
+  ScoreTrigger,
   ServerToClientEvents,
 } from '@flappy/shared';
 import type { Server } from 'socket.io';
@@ -17,6 +18,7 @@ import {
   MAX_VISIBLE_PLAYERS,
   randomSeed,
 } from '../server/config.js';
+import { createScoreValidationState } from '../server/score-validation.js';
 import { toLeaderboardEntry, toPlayerSnapshot, withMonitorTimes } from '../server/shared.js';
 import type {
   AssignSocketSession,
@@ -35,7 +37,12 @@ type CreateFfaRoomServiceParams = {
 export type FfaRoomService = {
   join: (playerId: PlayerId, displayName: string) => void;
   handlePlayerUpdate: (playerId: PlayerId, snapshot: PlayerSnapshot) => string | null;
-  handlePlayerFinish: (playerId: PlayerId, progress: number, score: number) => string | null;
+  handlePlayerFinish: (
+    playerId: PlayerId,
+    progress: number,
+    score: number,
+    scoreTrigger?: ScoreTrigger,
+  ) => string | null;
   handleDisconnect: (playerId: PlayerId) => void;
   buildMonitorDetails: (now: number) => MonitorRoomDetail[];
 };
@@ -167,7 +174,17 @@ export const createFfaRoomService = ({
         alive: existing?.alive ?? true,
         finished: existing?.finished ?? false,
         finishedAt: existing?.finishedAt,
+        scoreValidation:
+          existing?.scoreValidation
+          ?? createScoreValidationState(ffaRoom.summary.config.seed, (event) => {
+            debugLog('ffa score validation', {
+              playerId,
+              ...event,
+            });
+          }),
       };
+
+      player.scoreValidation.reset(ffaRoom.summary.config.seed);
 
       ffaRoom.players.set(playerId, player);
       io.sockets.sockets.get(playerId)?.join(FFA_ROOM_ID);
@@ -192,8 +209,10 @@ export const createFfaRoomService = ({
       player.y = snapshot.y;
       player.rotation = snapshot.rotation;
       player.updatedAt = Date.now();
-      player.score = Math.max(player.score, Math.max(0, snapshot.score));
-      player.progress = Math.max(player.progress, Math.max(0, snapshot.progress));
+      const validatedScore = player.scoreValidation.validateScoreTrigger(snapshot.scoreTrigger);
+      player.scoreValidation.notePosition(snapshot.x);
+      player.score = validatedScore;
+      player.progress = validatedScore;
       player.alive = player.finished ? false : snapshot.alive;
       player.finished = player.finished || snapshot.finished;
       if (snapshot.finished && player.finishedAt === undefined) {
@@ -203,14 +222,27 @@ export const createFfaRoomService = ({
       emitState();
       return null;
     },
-    handlePlayerFinish: (playerId, progress, score) => {
+    handlePlayerFinish: (playerId, progress, score, scoreTrigger) => {
       const player = ffaRoom.players.get(playerId);
       if (!player) {
         return 'Join the FFA room before finishing a run.';
       }
 
-      player.progress = Math.max(player.progress, progress);
-      player.score = Math.max(player.score, score);
+      const acceptedScore = player.scoreValidation.validateScoreTrigger(scoreTrigger);
+      const reportedProgress = Math.max(0, Math.floor(progress));
+      const reportedScore = Math.max(0, Math.floor(score));
+
+      if (reportedProgress !== acceptedScore || reportedScore !== acceptedScore) {
+        debugLog('ffa finish score mismatch rejected', {
+          playerId,
+          acceptedScore,
+          reportedProgress,
+          reportedScore,
+        });
+      }
+
+      player.score = acceptedScore;
+      player.progress = acceptedScore;
       player.updatedAt = Date.now();
       player.alive = false;
       player.finished = true;

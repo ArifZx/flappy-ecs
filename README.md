@@ -12,6 +12,12 @@ Repository: https://github.com/ArifZx/flappy-ecs
 - `docs/ffa-integration.md`: focused FFA multiplayer notes and implementation rules
 - `docs/server.md`: current multiplayer server behavior, event flow, and implementation limits
 
+Current multiplayer integrity model:
+
+- offline mode keeps a client-local deterministic pipe seed
+- online rooms use a server-generated seed for deterministic pipe generation
+- online score increments are validated on the server against the shared pipe-map rules
+
 ## Workspace Layout
 
 ```text

@@ -27,6 +27,13 @@ export type PlayerSnapshot = {
   alive: boolean;
   finished: boolean;
   updatedAt: number;
+  scoreTrigger?: ScoreTrigger;
+};
+
+export type ScoreTrigger = {
+  score: number;
+  worldX: number;
+  screenY: number;
 };
 
 export type NearbyPlayersSnapshot = {
@@ -114,6 +121,7 @@ export type PlayerFinishRequest = {
   roomId: RoomId;
   progress: number;
   score: number;
+  scoreTrigger?: ScoreTrigger;
 };
 
 export type RoomCountdown = {
@@ -168,3 +176,27 @@ export type ServerToClientEvents = {
   'leaderboard:update': (payload: LeaderboardUpdate) => void;
   'server:error': (payload: ServerErrorPayload) => void;
 };
+
+export {
+  BIRD_RADIUS,
+  BIRD_START_Y,
+  BIRD_X,
+  createPipeMapProvider,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  getGlobalDifficultyByMark,
+  getPipeGapByMark,
+  getPipeSpeedByMark,
+  GROUND_HEIGHT,
+  GROUND_Y,
+  isNightByMark,
+  MAX_DIFFICULTY_MARK,
+  NIGHT_MODE_STEP,
+  PIPE_GAP,
+  PIPE_HALF_HEIGHT,
+  PIPE_HALF_WIDTH,
+  PIPE_SPEED,
+  PIPE_SPEED_MAX,
+} from './game-rules.js';
+
+export type { PipeMapEntry, PipeMapProvider } from './game-rules.js';

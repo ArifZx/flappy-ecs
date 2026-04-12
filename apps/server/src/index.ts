@@ -208,10 +208,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('player:finish', ({ roomId, progress, score }) => {
+  socket.on('player:finish', ({ roomId, progress, score, scoreTrigger }) => {
     const error = roomId === FFA_ROOM_ID
-      ? ffaRoomService.handlePlayerFinish(playerId, progress, score)
-      : friendsRoomService.handlePlayerFinish(playerId, roomId, progress, score);
+      ? ffaRoomService.handlePlayerFinish(playerId, progress, score, scoreTrigger)
+      : friendsRoomService.handlePlayerFinish(playerId, roomId, progress, score, scoreTrigger);
 
     if (error) {
       emitServerError(playerId, error);

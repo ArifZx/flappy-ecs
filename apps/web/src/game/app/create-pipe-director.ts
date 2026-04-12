@@ -1,5 +1,6 @@
 import { entityExists } from 'bitecs';
 import type { Spritesheet } from 'pixi.js';
+import { createPipeMapProvider } from '@flappy/shared';
 
 import { BIRD_START_Y, GAME_WIDTH } from '../config/constants';
 import { Position } from '../ecs/components';
@@ -7,12 +8,11 @@ import type { PipeRuntimeResource } from '../ecs/resources';
 import { destroyEntity } from '../ecs/entity-lifecycle';
 import { spawnPipePair } from '../entities/pipe';
 import type { PhysicsAdapter } from '../physics';
-import {
-  createPipeMapProvider,
-} from '../systems/pipe-map';
 import { moveAndCleanupPipes } from '../systems/pipe-system';
 import type { GameRuntimeContext } from './create-runtime-context';
 import type { GameScene } from './create-scene';
+
+const OFFLINE_PIPE_SEED = 0x24f1a5c3;
 
 type CreatePipeDirectorParams = {
   context: GameRuntimeContext;
@@ -23,6 +23,7 @@ type CreatePipeDirectorParams = {
 };
 
 export type PipeDirector = {
+  setSeed: (seed: number | null) => void;
   reset: () => void;
   update: (dt: number, speed: number, mark: number) => number;
 };
@@ -34,8 +35,9 @@ export const createPipeDirector = ({
   scene,
   sheet,
 }: CreatePipeDirectorParams): PipeDirector => {
-  const pipeMapProvider = createPipeMapProvider({
-    seed: 0x24f1a5c3,
+  let currentSeed = OFFLINE_PIPE_SEED;
+  let pipeMapProvider = createPipeMapProvider({
+    seed: currentSeed,
     initialHeight: BIRD_START_Y,
   });
 
@@ -115,6 +117,18 @@ export const createPipeDirector = ({
   };
 
   return {
+    setSeed: (seed) => {
+      const nextSeed = seed ?? OFFLINE_PIPE_SEED;
+      if (nextSeed === currentSeed) {
+        return;
+      }
+
+      currentSeed = nextSeed;
+      pipeMapProvider = createPipeMapProvider({
+        seed: currentSeed,
+        initialHeight: BIRD_START_Y,
+      });
+    },
     reset,
     update,
   };

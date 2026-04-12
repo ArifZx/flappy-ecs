@@ -4,6 +4,7 @@ import type {
   RoomId,
   RoomSummary,
 } from '@flappy/shared';
+import type { ScoreValidationState } from './score-validation.js';
 
 export type SessionAssignment = {
   mode: 'free-for-all' | 'friends';
@@ -24,6 +25,7 @@ export type ConnectedPlayer = {
   alive: boolean;
   finished: boolean;
   finishedAt?: number;
+  scoreValidation: ScoreValidationState;
 };
 
 export type FriendsRoomRecord = {

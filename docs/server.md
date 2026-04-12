@@ -12,7 +12,12 @@ The server uses a Node.js HTTP server plus Socket.IO. Its current responsibiliti
 - storing the FFA leaderboard and nearby player snapshots
 - serving multiplayer event contracts shared through [packages/shared/src/index.ts](packages/shared/src/index.ts)
 
-The server is not authoritative for gameplay simulation yet. Clients still run local simulation and send snapshots to the server.
+The server is not authoritative for full gameplay simulation yet. Clients still run local bird simulation and send snapshots to the server.
+
+The server is now authoritative for two narrower but important things in online modes:
+
+- the room seed used for deterministic pipe generation
+- whether a claimed score increment is accepted
 
 ## File Locations
 
@@ -124,7 +129,9 @@ Per-player state stored by the server:
 - lifecycle: `joinedAt`, `updatedAt`, `alive`, `finished`, `finishedAt`
 - gameplay snapshot: `x`, `y`, `rotation`, `progress`, `score`
 
-The server preserves the highest observed score and progress with `Math.max(...)`, so later client updates must not reduce already-recorded progress.
+Each connected player also keeps a score-validation state that rebuilds the deterministic pipe sequence from the room seed and tracks the next expected point.
+
+The server no longer accepts raw online score progression at face value.
 
 ### FFA room
 
@@ -135,6 +142,8 @@ The FFA room stores:
 - `idleTimer`
 
 When the room is reset because of idleness, a new seed is generated through `randomSeed()`.
+
+That seed is also the source of truth for online pipe generation and server-side score validation.
 
 ### Friends room
 
@@ -169,7 +178,8 @@ The server then:
 
 - verifies that the target room is `ffa-main`
 - updates position, rotation, variant, and timestamp
-- only increases `score` and `progress` when the new values are higher
+- validates `snapshot.scoreTrigger` against the next deterministic pipe gap
+- only increases accepted `score` and `progress` when that trigger is valid
 - stamps `finishedAt` the first time a snapshot reports completion
 - re-broadcasts FFA state, leaderboard, and nearby players
 
@@ -180,9 +190,33 @@ Clients send `player:finish` when a run ends.
 The server then:
 
 - verifies that the player has joined FFA
-- stores the highest `progress` and `score`
+- re-validates any final `scoreTrigger` sent with `player:finish`
+- stores the accepted `progress` and `score`
 - marks the player as `alive = false`, `finished = true`, and sets `finishedAt`
 - re-broadcasts FFA state
+
+### Score validation debug
+
+When `MULTIPLAYER_DEBUG` is enabled, the server logs score-validation decisions for both FFA and friends rooms.
+
+The debug payload includes:
+
+- whether the trigger was accepted or rejected
+- the reason for rejection when applicable
+- trigger score and trigger position
+- the next expected pipe position and gap bounds
+- the current accepted score and last observed world position
+
+Common rejection reasons include:
+
+- `unexpected-score-step`
+- `non-finite-trigger`
+- `missing-next-pipe`
+- `trigger-before-pipe`
+- `trigger-too-far-past-pipe`
+- `horizontal-overlap-missed`
+- `vertical-gap-missed`
+- `player-already-past-pipe`
 
 ### Leaderboard
 
@@ -268,6 +302,13 @@ After countdown completes:
 - the server emits `room:state`
 - the server emits `room:lobby`
 
+While the room is running:
+
+- players use the same `player:update` and `player:finish` events as FFA
+- the server validates accepted score against the room seed and next expected pipe pair
+- nearby-player snapshots continue to be broadcast
+- the final leaderboard is emitted through `room:finished`
+
 ### Disconnect handling
 
 When a player leaves a friends room:
@@ -326,8 +367,6 @@ Errors are only sent back to the originating socket through `io.to(playerId)`.
 
 Some pieces are still intentionally incomplete:
 
-- friends mode does not yet accept or broadcast `player:update`
-- friends mode does not yet produce a final leaderboard and does not emit `room:finished`
 - there is no persistence; all state is lost when the process restarts
 - there is no authentication, rate limiting, or strict payload validation yet
 - CORS is limited to an allowlist, but there is no broader transport hardening yet

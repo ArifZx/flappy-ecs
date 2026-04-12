@@ -23,6 +23,7 @@ type CreateGameRuntimeParams = {
 export type GameRuntimeController = {
   flap: () => void;
   restart: () => void;
+  setCourseSeed: (seed: number | null) => void;
   update: (dt: number) => void;
   getPhase: () => GamePhase;
   peek: () => number;
@@ -92,6 +93,9 @@ export const createGameRuntime = ({
 
   return {
     flap: roundSystem.flap,
+    setCourseSeed: (seed) => {
+      pipeDirector.setSeed(seed);
+    },
     restart: () => {
       worldOffset = 0;
       roundSystem.restart();

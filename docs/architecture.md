@@ -423,6 +423,37 @@ At the moment:
 
 This means the game logic is no longer tightly coupled to `planck.World`, and the bootstrap file is no longer responsible for all gameplay decisions.
 
+## Online Map And Score Integrity
+
+Offline mode still uses a client-local deterministic pipe seed.
+
+Online modes now follow a stricter flow:
+
+- the server generates the room seed
+- the seed is sent through `RoomSummary.config.seed`
+- the web runtime applies that seed before online play starts
+- the same deterministic pipe-map rules are shared from `packages/shared`
+- the server rebuilds the next expected pipe sequence when validating score claims
+
+This does not make the backend fully authoritative for bird physics yet, but it does make online course generation server-seeded and online score acceptance server-checked.
+
+### Current integrity boundary
+
+Still client-authoritative:
+
+- flap timing
+- bird movement
+- local collision timing
+- raw position telemetry
+
+Now checked by the server for online modes:
+
+- room seed used for pipe generation
+- whether a claimed point matches the next expected pipe pair
+- whether the bird position was inside the gap when the point was claimed
+
+The client now emits a `scoreTrigger` only when local score increases, and `player:finish` can carry the final pending trigger so the last legitimate point is not dropped when a run ends immediately after scoring.
+
 ## Game-Over Actions
 
 The game-over interaction is intentionally split away from the Pixi scene and uses DOM controls instead.

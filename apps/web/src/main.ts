@@ -6,6 +6,7 @@ import type {
   NearbyPlayersSnapshot,
   RoomFinished,
   RoomKicked,
+  ScoreTrigger,
   RoomSummary,
 } from '@flappy/shared';
 import { Application, Assets, Container, Graphics } from 'pixi.js';
@@ -132,10 +133,16 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   let activeFriendsDurationSeconds = 0;
   let snapshotAccumulatorMs = 0;
   let finishReported = false;
+  let lastSentScore = 0;
+
+  const applyOnlineCourseSeed = (summary: RoomSummary | null): void => {
+    runtime.setCourseSeed(summary?.config.seed ?? null);
+  };
 
   const multiplayer = createMultiplayerClient({
     onFfaState: (summary) => {
       latestFfaState = summary;
+      applyOnlineCourseSeed(summary);
       if (activeMode === 'free-for-all') {
         sessionPanel.showFfa(summary, latestLeaderboard);
         if (mainMenu.isOpen()) {
@@ -153,6 +160,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       }
 
       activeFriendsRoomId = summary.roomId;
+      applyOnlineCourseSeed(summary);
 
       if (summary.status === 'running') {
         activeFriendsEndsAt = summary.endsAt ?? null;
@@ -165,6 +173,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     onLobbyState: (state) => {
       if (activeMode === 'friends') {
         activeFriendsRoomId = state.room.roomId;
+        applyOnlineCourseSeed(state.room);
         mainMenu.close();
 
         if (state.room.status !== 'waiting') {
@@ -252,6 +261,8 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     activeFriendsDurationSeconds = 0;
     snapshotAccumulatorMs = 0;
     finishReported = false;
+    lastSentScore = 0;
+    runtime.setCourseSeed(null);
     runtime.restart();
     gameOverActions.setVisible(false);
     gameOverActions.setScreenshotSrc(null);
@@ -277,6 +288,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
         gameplayEnabled = false;
         snapshotAccumulatorMs = 0;
         finishReported = false;
+        lastSentScore = 0;
         mainMenu.setStatus('Checking server RTT...');
         const rtt = await multiplayer.measureRtt('ffa-connect');
         mainMenu.setStatus(
@@ -292,6 +304,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
         gameplayEnabled = false;
         snapshotAccumulatorMs = 0;
         finishReported = false;
+        lastSentScore = 0;
         mainMenu.setStatus('Checking server RTT...');
         const rtt = await multiplayer.measureRtt(roomId ? 'friends-join' : 'friends-create');
         mainMenu.setStatus(
@@ -315,6 +328,8 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       gameplayEnabled = true;
       snapshotAccumulatorMs = 0;
       finishReported = false;
+      lastSentScore = 0;
+      runtime.setCourseSeed(null);
       runtime.restart();
       gameOverActions.setVisible(false);
       gameOverActions.setScreenshotSrc(null);
@@ -392,6 +407,14 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       if (snapshotAccumulatorMs >= FFA_SNAPSHOT_INTERVAL_MS) {
         snapshotAccumulatorMs %= FFA_SNAPSHOT_INTERVAL_MS;
         const snapshotState = runtime.getSnapshotState();
+        const scoreTrigger: ScoreTrigger | undefined = snapshotState.score > lastSentScore
+          ? {
+              score: snapshotState.score,
+              worldX: snapshotState.worldX,
+              screenY: snapshotState.screenY,
+            }
+          : undefined;
+        lastSentScore = Math.max(lastSentScore, snapshotState.score);
         const roomId = activeMode === 'free-for-all' ? FFA_ROOM_ID : activeFriendsRoomId;
         if (!roomId) {
           return;
@@ -411,6 +434,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
             alive: snapshotState.alive,
             finished: snapshotState.finished,
             updatedAt: Date.now(),
+            scoreTrigger,
           },
         });
       }
@@ -418,6 +442,14 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       if (phase === GamePhase.GameOver && !finishReported) {
         const snapshotState = runtime.getSnapshotState();
         finishReported = true;
+        const scoreTrigger: ScoreTrigger | undefined = snapshotState.score > lastSentScore
+          ? {
+              score: snapshotState.score,
+              worldX: snapshotState.worldX,
+              screenY: snapshotState.screenY,
+            }
+          : undefined;
+        lastSentScore = Math.max(lastSentScore, snapshotState.score);
         const roomId = activeMode === 'free-for-all' ? FFA_ROOM_ID : activeFriendsRoomId;
         if (!roomId) {
           return;
@@ -427,6 +459,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
           roomId,
           progress: snapshotState.progress,
           score: snapshotState.score,
+          scoreTrigger,
         });
       }
 

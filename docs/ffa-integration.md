@@ -8,7 +8,7 @@ It is intentionally practical and narrow in scope.
 
 Finish the first usable FFA loop before expanding the friends-room flow.
 
-The first usable FFA loop means:
+The current usable FFA loop means:
 
 - player can join the global FFA room
 - local run remains client-simulated
@@ -16,6 +16,8 @@ The first usable FFA loop means:
 - server maintains authoritative leaderboard state
 - client receives nearby player snapshots and renders remote birds without local physics
 - finish state is reported explicitly so the leaderboard can lock in final ordering
+- online pipe layout comes from the server-provided seed
+- online score increments are accepted only after server-side validation
 
 ## Current State
 
@@ -29,7 +31,7 @@ The server already supports:
 - `ffa:state`
 - `leaderboard:update`
 
-The server currently does not yet broadcast `players:nearby` snapshots.
+The server already broadcasts `players:nearby` snapshots.
 
 The FFA leaderboard is already sorted by:
 
@@ -46,35 +48,43 @@ The web client already supports:
 - showing the FFA session panel
 - running the local game loop
 
-The web client currently does not yet:
+The web client already:
 
-- publish gameplay snapshots during FFA
-- report finish state from the game runtime into the network layer
-- render nearby remote birds from server snapshots
+- publishes gameplay snapshots during FFA
+- reports finish state from the game runtime into the network layer
+- renders nearby remote birds from server snapshots
+- applies the room seed from the server before online play starts
 
 ## FFA Design Rules
 
-### 1. Local simulation stays local
+### 1. Bird simulation stays local, online pipe seed does not
 
 For this first FFA version, the local player still runs the normal local offline simulation.
 
 That means:
 
 - flap timing stays local
-- pipe generation stays local
+- bird movement stays local
 - collisions stay local
-- score progression stays local
+- offline pipe generation stays local
+
+For online FFA specifically:
+
+- the server chooses `config.seed`
+- the client uses that seed for deterministic pipe generation
+- the server reconstructs the same sequence to validate score triggers
 
 The server is not responsible for simulating bird physics in this phase.
 
-### 2. Server owns room state and leaderboard state
+### 2. Server owns room state, room seed, and accepted score state
 
 The server should be treated as the source of truth for:
 
 - who is currently in the FFA room
 - each player display name
-- each player latest published progress
-- each player latest published score
+- the room seed used for online pipe generation
+- each player accepted progress
+- each player accepted score
 - alive/finished state
 - final leaderboard ordering
 
@@ -100,7 +110,7 @@ Reasons:
 - much cheaper than pushing every render tick
 - simple enough to implement without interpolation complexity explosion
 
-### 5. Finish must be explicit
+### 5. Finish must be explicit and may carry the last score trigger
 
 Regular snapshots are not enough for final placement.
 
@@ -109,6 +119,8 @@ The client must send `player:finish` once when the run is over, carrying at leas
 - room id
 - latest progress
 - latest score
+
+It may also carry the last pending `scoreTrigger` when the final point happened right before game over.
 
 After a finish message:
 
@@ -161,9 +173,10 @@ The existing shared `PlayerSnapshot` type already includes:
 For the first FFA version:
 
 - `x`, `y`, and `rotation` are used only for remote rendering
-- `progress` and `score` drive leaderboard ordering
+- `progress` and `score` are telemetry, not authoritative proof on their own
 - `alive` and `finished` drive remote bird visibility and end-state presentation
 - `updatedAt` is useful for pruning stale remote data later
+- `scoreTrigger` is used for server-side point acceptance
 
 ## Server Broadcast Expectations
 
@@ -222,22 +235,22 @@ They must not affect:
 - local score progression
 - local pipe pass detection
 
-### Do not trust client snapshots for anti-cheat
+### Do not trust raw client score fields for anti-cheat
 
 This first FFA pass is not authoritative simulation.
 
-So snapshots are accepted as gameplay telemetry, not strong anti-cheat proof.
+So movement snapshots are still accepted as gameplay telemetry, not strong anti-cheat proof.
+
+However, score is no longer accepted from the raw `score` field alone. The server validates score increments against the shared deterministic map rules, the room seed, the next expected pipe pair, and the claimed bird position inside the gap.
 
 If stronger integrity is needed later, that requires a different design.
 
 ## Suggested Implementation Order
 
-1. extend the client networking adapter with `players:nearby` handling
-2. add a 20 FPS snapshot publisher from the web runtime
-3. add one-shot finish reporting
-4. make the server broadcast FFA nearby snapshots
-5. render remote birds from server snapshots
-6. prune stale remote birds and validate cleanup on disconnect
+1. add movement sanity checks on the server
+2. add rate limiting for `player:update`
+3. derive leaderboard progress from validated state instead of trusting raw client numbers
+4. expand runtime diagnostics for the last accepted point on finish
 
 ## Definition Of Done For First FFA Pass
 
@@ -245,7 +258,8 @@ The first FFA pass is good enough when:
 
 - two browser tabs can join the same FFA room
 - each tab sees the other bird moving
-- leaderboard updates as score changes
+- leaderboard updates as accepted score changes
 - disconnect removes the remote bird cleanly
 - finish updates leaderboard state cleanly
 - offline mode still works unchanged
+- online FFA uses the server room seed instead of a fixed local online seed

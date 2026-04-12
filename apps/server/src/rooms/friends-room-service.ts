@@ -5,6 +5,7 @@ import type {
   PlayerId,
   PlayerSnapshot,
   RoomLobbyState,
+  ScoreTrigger,
   ServerToClientEvents,
 } from '@flappy/shared';
 import type { Server } from 'socket.io';
@@ -16,6 +17,7 @@ import {
   MAX_VISIBLE_PLAYERS,
   randomSeed,
 } from '../server/config.js';
+import { createScoreValidationState } from '../server/score-validation.js';
 import { toLeaderboardEntry, toPlayerSnapshot, withMonitorTimes } from '../server/shared.js';
 import type {
   AssignSocketSession,
@@ -38,7 +40,13 @@ export type FriendsRoomService = {
   startRoom: (playerId: PlayerId, roomId: string) => string | null;
   kickPlayer: (playerId: PlayerId, roomId: string, targetPlayerId: PlayerId) => string | null;
   handlePlayerUpdate: (playerId: PlayerId, roomId: string, snapshot: PlayerSnapshot) => string | null;
-  handlePlayerFinish: (playerId: PlayerId, roomId: string, progress: number, score: number) => string | null;
+  handlePlayerFinish: (
+    playerId: PlayerId,
+    roomId: string,
+    progress: number,
+    score: number,
+    scoreTrigger?: ScoreTrigger,
+  ) => string | null;
   handleDisconnect: (playerId: PlayerId, roomId: string) => void;
   buildMonitorDetails: (now: number) => MonitorRoomDetail[];
 };
@@ -146,6 +154,12 @@ export const createFriendsRoomService = ({
     updatedAt: Date.now(),
     alive: true,
     finished: false,
+    scoreValidation: createScoreValidationState(0, (event) => {
+      debugLog('friends score validation', {
+        playerId,
+        ...event,
+      });
+    }),
   });
 
   return {
@@ -178,6 +192,7 @@ export const createFriendsRoomService = ({
       };
 
       friendsRooms.set(roomId, room);
+      player.scoreValidation.reset(room.summary.config.seed);
       io.sockets.sockets.get(playerId)?.join(roomId);
       assignSocketSession(playerId, { mode: 'friends', roomId });
       debugLog('friends room created', {
@@ -201,6 +216,7 @@ export const createFriendsRoomService = ({
       }
 
       const player = createPlayer(playerId, displayName);
+      player.scoreValidation.reset(room.summary.config.seed);
       room.players.set(playerId, player);
       room.summary.connectedCount = room.players.size;
       io.sockets.sockets.get(playerId)?.join(normalizedRoomId);
@@ -369,8 +385,10 @@ export const createFriendsRoomService = ({
       player.y = snapshot.y;
       player.rotation = snapshot.rotation;
       player.updatedAt = Date.now();
-      player.score = Math.max(player.score, Math.max(0, snapshot.score));
-      player.progress = Math.max(player.progress, Math.max(0, snapshot.progress));
+      const validatedScore = player.scoreValidation.validateScoreTrigger(snapshot.scoreTrigger);
+      player.scoreValidation.notePosition(snapshot.x);
+      player.score = validatedScore;
+      player.progress = validatedScore;
       player.alive = player.finished ? false : snapshot.alive;
       player.finished = player.finished || snapshot.finished;
       if (snapshot.finished && player.finishedAt === undefined) {
@@ -380,7 +398,7 @@ export const createFriendsRoomService = ({
       emitNearbyPlayers(room);
       return null;
     },
-    handlePlayerFinish: (playerId, roomId, progress, score) => {
+    handlePlayerFinish: (playerId, roomId, progress, score, scoreTrigger) => {
       const room = friendsRooms.get(roomId);
       if (!room) {
         return `Room ${roomId} was not found.`;
@@ -395,8 +413,22 @@ export const createFriendsRoomService = ({
         return `Join room ${roomId} before finishing a run.`;
       }
 
-      player.progress = Math.max(player.progress, progress);
-      player.score = Math.max(player.score, score);
+      const acceptedScore = player.scoreValidation.validateScoreTrigger(scoreTrigger);
+      const reportedProgress = Math.max(0, Math.floor(progress));
+      const reportedScore = Math.max(0, Math.floor(score));
+
+      if (reportedProgress !== acceptedScore || reportedScore !== acceptedScore) {
+        debugLog('friends finish score mismatch rejected', {
+          playerId,
+          roomId,
+          acceptedScore,
+          reportedProgress,
+          reportedScore,
+        });
+      }
+
+      player.score = acceptedScore;
+      player.progress = acceptedScore;
       player.updatedAt = Date.now();
       player.alive = false;
       player.finished = true;
