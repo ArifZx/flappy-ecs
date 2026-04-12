@@ -1,34 +1,34 @@
 # Flappy Server
 
-Dokumen ini menjelaskan perilaku server multiplayer yang ada di [apps/server/src/index.ts](apps/server/src/index.ts). Fokusnya adalah runtime yang berjalan sekarang, bukan desain target jangka panjang.
+This document explains the current multiplayer server behavior in [apps/server/src/index.ts](apps/server/src/index.ts). It describes the runtime that exists today, not the long-term target design.
 
-## Ringkasan
+## Summary
 
-Server memakai Node.js HTTP server + Socket.IO. Tanggung jawab utamanya saat ini:
+The server uses a Node.js HTTP server plus Socket.IO. Its current responsibilities are:
 
-- menyediakan health endpoint HTTP sederhana
-- mengelola room Free For All global
-- mengelola friends room untuk lobby, countdown, dan start state
-- menyimpan leaderboard FFA dan snapshot pemain terdekat
-- mengirim event multiplayer yang tipenya dibagi lewat [packages/shared/src/index.ts](packages/shared/src/index.ts)
+- exposing a simple HTTP health endpoint
+- managing the global Free For All room
+- managing friends rooms for lobby, countdown, and start state
+- storing the FFA leaderboard and nearby player snapshots
+- serving multiplayer event contracts shared through [packages/shared/src/index.ts](packages/shared/src/index.ts)
 
-Server ini belum authoritative untuk simulasi gameplay. Klien masih menjalankan simulasi lokal lalu mengirim snapshot ke server.
+The server is not authoritative for gameplay simulation yet. Clients still run local simulation and send snapshots to the server.
 
-## Lokasi File
+## File Locations
 
-- [apps/server/src/index.ts](apps/server/src/index.ts): implementasi server saat ini
-- [apps/server/package.json](apps/server/package.json): script dev, build, dan start
-- [packages/shared/src/index.ts](packages/shared/src/index.ts): kontrak event dan payload client-server
+- [apps/server/src/index.ts](apps/server/src/index.ts): current server implementation
+- [apps/server/package.json](apps/server/package.json): dev, build, and start scripts
+- [packages/shared/src/index.ts](packages/shared/src/index.ts): shared event and payload contracts
 
-## Menjalankan Server
+## Running the Server
 
-Environment variable yang dipakai:
+Environment variables in use:
 
-- `PORT`: default `3001`
-- `MULTIPLAYER_DEBUG`: default aktif. Set `0` untuk mematikan debug log.
-- `CORS_ORIGINS`: daftar origin yang diizinkan, dipisahkan koma
+- `PORT`: defaults to `3001`
+- `MULTIPLAYER_DEBUG`: enabled by default. Set it to `0` to disable debug logging.
+- `CORS_ORIGINS`: comma-separated allowlist of accepted origins
 
-Default CORS origin yang diizinkan:
+Default allowed CORS origins:
 
 - `https://flappy.arifz.com`
 - `http://localhost:5173`
@@ -36,13 +36,13 @@ Default CORS origin yang diizinkan:
 - `http://localhost:4173`
 - `http://127.0.0.1:4173`
 
-Kalau perlu override, isi `CORS_ORIGINS` dengan format seperti ini:
+Override the allowlist like this when needed:
 
 ```env
 CORS_ORIGINS=https://flappy.arifz.com,http://localhost:5173
 ```
 
-Perintah yang tersedia:
+Available commands:
 
 ```bash
 pnpm dev:server
@@ -50,84 +50,84 @@ pnpm --filter @flappy/server build
 pnpm --filter @flappy/server start
 ```
 
-Health check HTTP tersedia di `GET /` dan mengembalikan JSON status sederhana.
+The HTTP health check is available at `GET /` and returns a simple JSON status payload.
 
-Monitor HTTP tersedia di `GET /monitor` dan mengembalikan ringkasan room aktif beserta jumlah player per room.
+The HTTP monitor is available at `GET /monitor` and returns a summary of active rooms plus player counts per room.
 
-Contoh field penting dari `GET /monitor`:
+Important fields in the `GET /monitor` response:
 
-- `rooms.total`: total room yang sedang dilacak server, termasuk FFA global
-- `players.total`: total player di semua room
-- `roomDetails[]`: daftar room dengan `roomId`, `mode`, `status`, dan `playerCount`
-- `roomDetails[].createdAtIso`: waktu room dibuat dalam format ISO
-- `roomDetails[].uptimeSeconds`: sudah berapa lama room aktif dalam detik
+- `rooms.total`: total rooms currently tracked by the server
+- `players.total`: total players across all rooms
+- `roomDetails[]`: room list with `roomId`, `mode`, `status`, and `playerCount`
+- `roomDetails[].createdAtIso`: room creation time in ISO format
+- `roomDetails[].uptimeSeconds`: how long the room has been active in seconds
 
-Untuk room FFA global, monitor juga bisa mengembalikan field tambahan saat room sedang kosong tetapi masih menunggu auto-shutdown:
+For the global FFA room, the monitor can also return extra fields while the room is empty but still waiting for auto-shutdown:
 
-- `lastPlayerDisconnectedAtIso`: waktu player terakhir disconnect
-- `idleShutdownAtIso`: deadline room idle akan dibersihkan
-- `secondsUntilShutdown`: sisa waktu sebelum room FFA dihapus dari monitor
+- `lastPlayerDisconnectedAtIso`: when the latest player disconnected
+- `idleShutdownAtIso`: when the idle room will be cleaned up
+- `secondsUntilShutdown`: remaining time before the FFA room disappears from the monitor
 
-Catatan perilaku monitor:
+Monitor behavior notes:
 
-- FFA hanya muncul di `roomDetails[]` jika masih ada player, atau jika sedang dalam masa tunggu idle timeout.
-- Setelah timeout idle selesai dan tidak ada player baru yang join, room FFA tidak lagi ditampilkan sebagai room aktif di monitor.
+- The FFA room only appears in `roomDetails[]` if it still has players, or if it is in the idle timeout grace period.
+- After the idle timeout completes and no new player joins, the FFA room is no longer shown as an active room in the monitor.
 
-## Arsitektur Runtime
+## Runtime Architecture
 
-Server menyimpan dua kategori session:
+The server currently tracks two session categories:
 
-- satu room FFA global dengan id tetap `ffa-main`
-- banyak friends room dengan kode acak 6 karakter uppercase
+- one global FFA room with the fixed id `ffa-main`
+- multiple friends rooms with random 6-character uppercase room codes
 
-Setiap socket diberi assignment session aktif:
+Each socket receives an active session assignment:
 
 - `free-for-all`
 - `friends`
 
-Assignment ini dipakai saat disconnect untuk membersihkan room yang benar.
+That assignment is used during disconnect handling so the server can clean up the correct room.
 
-## Konstanta Penting
+## Important Constants
 
-Nilai default runtime saat ini:
+Current default runtime values:
 
 - `FFA_ROOM_ID = "ffa-main"`
 - `FFA_IDLE_TIMEOUT_MS = 30000`
 - `FFA_DURATION_SECONDS = 90`
 - `MAX_VISIBLE_PLAYERS = 20`
-- posisi spawn default pemain: `x = 78`, `y = 220`
+- default player spawn position: `x = 78`, `y = 220`
 
-Implikasinya:
+Implications:
 
-- room FFA selalu dianggap `running`
-- kalau FFA kosong selama 30 detik, state room di-reset penuh
-- daftar pemain terdekat dikirim maksimum 20 pemain per klien
+- the FFA room is always treated as `running` while active
+- if FFA stays empty for 30 seconds, its state is fully reset
+- nearby player snapshots are capped at 20 players per client
 
-## Data Model Server
+## Server Data Model
 
 ### ConnectedPlayer
 
-State per pemain yang disimpan server:
+Per-player state stored by the server:
 
-- identitas: `playerId`, `displayName`, `variant`
+- identity: `playerId`, `displayName`, `variant`
 - lifecycle: `joinedAt`, `updatedAt`, `alive`, `finished`, `finishedAt`
 - gameplay snapshot: `x`, `y`, `rotation`, `progress`, `score`
 
-Server mempertahankan nilai skor dan progress tertinggi dengan `Math.max(...)`, jadi update klien tidak boleh menurunkan progress yang sudah tercatat.
+The server preserves the highest observed score and progress with `Math.max(...)`, so later client updates must not reduce already-recorded progress.
 
 ### FFA room
 
-FFA menyimpan:
+The FFA room stores:
 
 - `summary: RoomSummary`
 - `players: Map<PlayerId, ConnectedPlayer>`
 - `idleTimer`
 
-Saat room di-reset karena idle, seed baru dibuat lagi lewat `randomSeed()`.
+When the room is reset because of idleness, a new seed is generated through `randomSeed()`.
 
 ### Friends room
 
-Friends room menyimpan:
+Each friends room stores:
 
 - `roomId`
 - `hostPlayerId`
@@ -135,144 +135,144 @@ Friends room menyimpan:
 - `summary`
 - `countdownTimer`
 
-Host akan dipindah ke pemain berikutnya saat host disconnect selama room masih punya anggota.
+If the host disconnects while the room still has players, host ownership is transferred to the next available player.
 
 ## Free For All Flow
 
 ### Join
 
-Klien masuk FFA dengan event `ffa:join`.
+Clients enter FFA through the `ffa:join` event.
 
-Saat join:
+On join:
 
-- idle timer FFA dibatalkan
-- pemain dibuat atau dipulihkan dari record yang ada untuk socket itu
-- socket join ke room `ffa-main`
-- server broadcast state FFA terbaru
+- the FFA idle timer is cleared
+- the player record is created or restored for that socket
+- the socket joins the `ffa-main` room
+- the server broadcasts the latest FFA state
 
-### Update gameplay
+### Gameplay updates
 
-Klien mengirim `player:update` berisi `snapshot`.
+Clients send `player:update` with a `snapshot` payload.
 
-Server lalu:
+The server then:
 
-- memastikan room yang dituju adalah `ffa-main`
-- memperbarui posisi, rotasi, variant, dan timestamp pemain
-- menaikkan `score` dan `progress` hanya jika nilai baru lebih tinggi
-- menandai `finishedAt` saat snapshot pertama kali menyatakan finish
-- mem-broadcast ulang state FFA, leaderboard, dan nearby players
+- verifies that the target room is `ffa-main`
+- updates position, rotation, variant, and timestamp
+- only increases `score` and `progress` when the new values are higher
+- stamps `finishedAt` the first time a snapshot reports completion
+- re-broadcasts FFA state, leaderboard, and nearby players
 
 ### Finish
 
-Klien mengirim `player:finish` saat run selesai.
+Clients send `player:finish` when a run ends.
 
-Server lalu:
+The server then:
 
-- memastikan pemain memang sudah join FFA
-- menyimpan `progress` dan `score` tertinggi
-- menandai pemain `alive = false`, `finished = true`, dan memberi `finishedAt`
-- mem-broadcast ulang state FFA
+- verifies that the player has joined FFA
+- stores the highest `progress` and `score`
+- marks the player as `alive = false`, `finished = true`, and sets `finishedAt`
+- re-broadcasts FFA state
 
 ### Leaderboard
 
-Leaderboard dibangun dari seluruh pemain FFA dengan urutan:
+The leaderboard is built from all FFA players using this sort order:
 
-1. `score` tertinggi
-2. `progress` tertinggi
-3. `joinedAt` paling awal
+1. highest `score`
+2. highest `progress`
+3. earliest `joinedAt`
 
-Server hanya mengirim 10 entri teratas lewat event `leaderboard:update`.
+The server only sends the top 10 entries through `leaderboard:update`.
 
-Payload juga menyertakan `maxScore`, yaitu skor pemain teratas saat itu.
+The payload also includes `maxScore`, which is the current score of the top player.
 
 ### Nearby players
 
-Untuk setiap pemain FFA, server juga mengirim `players:nearby` yang isinya:
+For each FFA player, the server also sends `players:nearby` containing:
 
-- semua pemain selain dirinya sendiri
-- diurutkan dengan prioritas pemain hidup dulu, lalu progress, lalu update terbaru
-- dipotong maksimal `maxVisiblePlayers`
+- all other players except the receiving player
+- sorted with living players first, then by progress, then by most recent update
+- truncated to `maxVisiblePlayers`
 
-Model ini cocok dengan pendekatan client saat ini: remote player hanya dipakai untuk presentasi, bukan simulasi otoritatif.
+This fits the current client approach: remote players are presentation-only and are not part of authoritative simulation.
 
 ### Idle shutdown
 
-Kalau semua pemain keluar dari FFA:
+When all players leave FFA:
 
-- server menjadwalkan timer 30 detik
-- jika tetap kosong sampai timer selesai, room FFA dibuat ulang dari nol
+- the server schedules a 30 second timer
+- if the room is still empty when the timer expires, the FFA room is recreated from scratch
 
-Reset ini membersihkan leaderboard, pemain, dan seed sebelumnya.
+That reset clears players, leaderboard state, and the previous seed.
 
 ## Friends Room Flow
 
 ### Create room
 
-Event `room:create` membuat room baru dengan:
+The `room:create` event creates a new room with:
 
-- kode room acak uppercase 6 karakter
-- host = socket pembuat room
-- status awal `waiting`
+- a random 6-character uppercase room code
+- the creating socket as host
+- initial status `waiting`
 - `countdownSeconds = 5`
-- `durationSeconds` dari request host
+- `durationSeconds` from the host request
 
-Setelah itu server mengirim:
+The server then sends:
 
-- `room:created` ke pembuat room
-- `room:lobby` ke semua anggota room
+- `room:created` to the creator
+- `room:lobby` to all room members
 
 ### Join room
 
-Event `room:join` hanya berhasil jika:
+The `room:join` event only succeeds when:
 
-- room ada
-- status room masih `waiting`
+- the room exists
+- the room status is still `waiting`
 
-Jika valid, pemain dimasukkan ke map room, socket join ke room tersebut, lalu server mengirim `room:joined` dan `room:lobby`.
+If valid, the player is inserted into the room map, the socket joins the room, and the server emits `room:joined` and `room:lobby`.
 
 ### Update config
 
-Event `room:update-config` hanya bisa dilakukan oleh host dan hanya saat status `waiting`.
+The `room:update-config` event can only be called by the host, and only while the room status is `waiting`.
 
-Saat berhasil:
+On success:
 
-- `durationSeconds` room diperbarui
-- server emit `room:state`
-- server emit `room:lobby` untuk refresh lobby state per pemain
+- `durationSeconds` is updated
+- the server emits `room:state`
+- the server emits `room:lobby` to refresh per-player lobby state
 
 ### Start room
 
-Event `room:start` hanya bisa dilakukan oleh host dan hanya dari status `waiting`.
+The `room:start` event can only be called by the host, and only while the room status is `waiting`.
 
-Saat start:
+When started:
 
-- status room berubah ke `countdown`
-- `startsAt` dan `endsAt` diisi
-- server emit `room:countdown`
-- server emit `room:lobby`
+- the room status changes to `countdown`
+- `startsAt` and `endsAt` are populated
+- the server emits `room:countdown`
+- the server emits `room:lobby`
 
-Setelah countdown selesai:
+After countdown completes:
 
-- status berubah ke `running`
-- server emit `room:state`
-- server emit `room:lobby`
+- the room status changes to `running`
+- the server emits `room:state`
+- the server emits `room:lobby`
 
 ### Disconnect handling
 
-Saat pemain keluar dari friends room:
+When a player leaves a friends room:
 
-- pemain dihapus dari room
-- bila host keluar, host baru dipilih dari pemain pertama yang tersisa
-- lobby state dikirim ulang
-- room dihapus penuh bila sudah kosong
+- the player is removed from the room
+- if the host leaves, the next remaining player becomes host
+- lobby state is broadcast again
+- the room is deleted completely if it becomes empty
 
-Kalau room sedang punya `countdownTimer`, timer juga dibersihkan saat room dihapus.
+If the room still has a `countdownTimer`, it is also cleared when the room is deleted.
 
 ## Event Contract
 
-Definisi tipenya ada di [packages/shared/src/index.ts](packages/shared/src/index.ts).
+Type definitions live in [packages/shared/src/index.ts](packages/shared/src/index.ts).
 
-### Client ke server
+### Client to server
 
 - `system:ping`
 - `ffa:join`
@@ -283,7 +283,7 @@ Definisi tipenya ada di [packages/shared/src/index.ts](packages/shared/src/index
 - `player:update`
 - `player:finish`
 
-### Server ke client
+### Server to client
 
 - `system:pong`
 - `ffa:state`
@@ -297,49 +297,49 @@ Definisi tipenya ada di [packages/shared/src/index.ts](packages/shared/src/index
 - `room:finished`
 - `server:error`
 
-Catatan penting: `room:finished` sudah ada di shared contract, tetapi belum pernah di-emit oleh implementasi server saat ini.
+Important note: `room:finished` already exists in the shared contract, but the current server implementation does not emit it yet.
 
 ## Error Handling
 
-Server mengirim `server:error` untuk kasus validasi umum seperti:
+The server emits `server:error` for common validation failures such as:
 
-- room friends tidak ditemukan
-- room friends sudah berjalan
-- non-host mencoba update config atau start room
-- klien mengirim snapshot sebelum join FFA
-- klien mencoba memakai `player:update` atau `player:finish` untuk mode friends
+- friends room not found
+- friends room already in progress
+- non-host trying to update config or start a room
+- client sending snapshots before joining FFA
+- client trying to use `player:update` or `player:finish` for friends mode
 
-Error dikirim hanya ke socket pengirim lewat `io.to(playerId)`.
+Errors are only sent back to the originating socket through `io.to(playerId)`.
 
-## Batasan Implementasi Saat Ini
+## Current Limitations
 
-Beberapa hal yang belum diimplementasikan penuh:
+Some pieces are still intentionally incomplete:
 
-- friends mode belum menerima atau mendistribusikan `player:update`
-- friends mode belum punya leaderboard akhir dan belum emit `room:finished`
-- tidak ada persistence; semua state hilang saat proses restart
-- tidak ada autentikasi, rate limiting, atau validasi payload yang ketat
-- CORS saat ini terbuka ke semua origin
-- room membership sepenuhnya berbasis socket yang sedang terkoneksi
+- friends mode does not yet accept or broadcast `player:update`
+- friends mode does not yet produce a final leaderboard and does not emit `room:finished`
+- there is no persistence; all state is lost when the process restarts
+- there is no authentication, rate limiting, or strict payload validation yet
+- CORS is limited to an allowlist, but there is no broader transport hardening yet
+- room membership is entirely based on currently connected sockets
 
-Ini berarti server sekarang paling cocok dipakai sebagai session coordinator dan broadcaster ringan, bukan authoritative multiplayer simulation.
+That means the server is currently best treated as a session coordinator and lightweight broadcaster, not an authoritative multiplayer simulation server.
 
-## Debugging dan Operasional
+## Debugging and Operations
 
-Jika `MULTIPLAYER_DEBUG` aktif, server akan log event penting seperti:
+When `MULTIPLAYER_DEBUG` is enabled, the server logs important events such as:
 
-- koneksi dan disconnect socket
-- join FFA
-- create/join/update/start friends room
+- socket connect and disconnect
+- FFA joins
+- friends room create, join, update, and start actions
 
-Log memakai prefix `[multiplayer]` supaya mudah difilter.
+All logs use the `[multiplayer]` prefix so they are easy to filter.
 
-## Saran Pengembangan Berikutnya
+## Recommended Next Steps
 
-Urutan pengembangan yang paling masuk akal dari implementasi sekarang:
+The most sensible follow-up order from the current implementation is:
 
-1. Tambahkan snapshot handling untuk friends mode.
-2. Tambahkan penyelesaian round friends dan emit `room:finished`.
-3. Putuskan apakah server akan tetap relay-only atau jadi authoritative untuk progress/score.
-4. Tambahkan validasi payload dan guard anti-spam untuk event realtime.
-5. Tambahkan persistence bila leaderboard atau room state perlu bertahan lintas restart.
+1. Add snapshot handling for friends mode.
+2. Add friends round completion and emit `room:finished`.
+3. Decide whether the server remains relay-only or becomes authoritative for progress and score.
+4. Add payload validation and anti-spam guards for realtime events.
+5. Add persistence if leaderboard or room state needs to survive process restarts.
