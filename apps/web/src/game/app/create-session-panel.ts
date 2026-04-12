@@ -73,6 +73,7 @@ const floatingLabelStyle = {
   fontWeight: '700',
   fill: 0x90ddf6,
   letterSpacing: 0,
+  padding: 2,
 } as const;
 
 const floatingTitleStyle = {

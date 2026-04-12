@@ -48,8 +48,9 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
     style: {
       fontFamily: UI_FONT_FAMILY,
       fontSize: 22,
+      padding: 10,
       fill: 0xf6efc2,
-      stroke: { color: 0x1b2530, width: 4 },
+      stroke: { color: 0x1b2530, width: 3 },
     },
   });
   pointsText.anchor.set(0.5, 0);
@@ -64,8 +65,9 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
       fontSize: 12,
       fontWeight: '700',
       align: 'center',
+      padding: 6,
       fill: 0xf6efc2,
-      stroke: { color: 0x1b2530, width: 3 },
+      stroke: { color: 0x1b2530, width: 2 },
     },
   });
   partyHudText.anchor.set(0.5, 0);
