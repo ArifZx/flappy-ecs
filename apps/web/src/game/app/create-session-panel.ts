@@ -22,7 +22,7 @@ import {
   neutralButtonTheme,
   primaryButtonTheme,
   type UiButtonController,
-} from '../ui/main-menu-ui.ts';
+} from '../ui/main-menu-ui';
 
 export type SessionPanelController = {
   hide: () => void;
