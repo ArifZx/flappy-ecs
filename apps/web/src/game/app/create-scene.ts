@@ -67,7 +67,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
       align: 'center',
       padding: 6,
       fill: 0xf6efc2,
-      stroke: { color: 0x1b2530, width: 2 },
+      stroke: { color: 0x1b2530, width: 1 },
     },
   });
   partyHudText.anchor.set(0.5, 0);

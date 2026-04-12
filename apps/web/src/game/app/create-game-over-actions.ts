@@ -8,10 +8,20 @@ export type GameOverActionsController = {
   setScreenshotSrc: (src: string | null) => void;
 };
 
+const createShareFile = async (src: string): Promise<File | null> => {
+  try {
+    const response = await fetch(src);
+    const blob = await response.blob();
+    return new File([blob], `flappy-party-${Date.now()}.png`, { type: blob.type || 'image/png' });
+  } catch {
+    return null;
+  }
+};
+
 const downloadImageSrc = (src: string): void => {
   const link = document.createElement('a');
   link.href = src;
-  link.download = `flappy-death-${Date.now()}.png`;
+  link.download = `flappy-party-${Date.now()}.png`;
   link.click();
 };
 
@@ -45,9 +55,34 @@ export const createGameOverActions = ({
 
   restartButton.addEventListener('click', onRestart);
 
-  shareButton.addEventListener('click', () => {
+  shareButton.addEventListener('click', async () => {
     const screenshotSrc = screenshotImage.currentSrc || screenshotImage.src;
-    if (!screenshotSrc) return;
+    if (!screenshotSrc) {
+      return;
+    }
+
+    if (typeof navigator.share === 'function') {
+      const shareFile = await createShareFile(screenshotSrc);
+      if (shareFile) {
+        const shareData = {
+          title: 'FLAPPY PARTY!',
+          text: 'Come flap with me in FLAPPY PARTY!',
+          files: [shareFile],
+        };
+
+        if (typeof navigator.canShare !== 'function' || navigator.canShare(shareData)) {
+          try {
+            await navigator.share(shareData);
+            return;
+          } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              return;
+            }
+          }
+        }
+      }
+    }
+
     downloadImageSrc(screenshotSrc);
   });
 

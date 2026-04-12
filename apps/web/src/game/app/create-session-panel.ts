@@ -61,6 +61,9 @@ const FRIENDS_LIST_TITLE_Y = 270;
 const FRIENDS_LIST_START_Y = 292;
 const FRIENDS_LIST_HEIGHT = 96;
 const FRIENDS_ACTION_BUTTON_Y = 396;
+const FRIENDS_FINISHED_LIST_TITLE_Y = 104;
+const FRIENDS_FINISHED_LIST_START_Y = 128;
+const FRIENDS_FINISHED_LIST_HEIGHT = 252;
 const ROOM_CODE_BUTTON_WIDTH = 64;
 const ROOM_CODE_BUTTON_GAP = 8;
 const ROOM_CODE_PILL_HEIGHT = 34;
@@ -412,6 +415,19 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     friendsDialog.visible = false;
   };
 
+  const setRoomCodeVisible = (visible: boolean): void => {
+    roomCodeBackground.visible = visible;
+    roomCodeText.visible = visible;
+    copyRoomCodeButton.view.visible = visible;
+  };
+
+  const setFriendsListLayout = (titleY: number, listY: number, listHeight: number): void => {
+    listTitle.position.y = titleY;
+    friendsList.position.y = listY;
+    friendsList.height = listHeight;
+    friendsList.resize(true);
+  };
+
   const syncDurationButtons = (selectedDuration: number, enabled: boolean): void => {
     for (const entry of durationButtons) {
       entry.controller.setTheme(entry.seconds === selectedDuration ? primaryButtonTheme : neutralButtonTheme);
@@ -491,6 +507,8 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     },
     showFriendsLobby: (state) => {
       openDialog();
+      setRoomCodeVisible(true);
+      setFriendsListLayout(FRIENDS_LIST_TITLE_Y, FRIENDS_LIST_START_Y, FRIENDS_LIST_HEIGHT);
       drawRoundedRect(
         roomCodeBackground,
         FRIENDS_CONTENT_WIDTH - ROOM_CODE_BUTTON_WIDTH - ROOM_CODE_BUTTON_GAP,
@@ -508,7 +526,6 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
       roomCodeText.text = `ROOM CODE ${state.room.roomId}`;
       copyRoomCode = state.room.roomId;
       resetCopyButton();
-      copyRoomCodeButton.view.visible = true;
       durationSection.visible = true;
       durationSummary.text = state.canStart
         ? 'Pick the timer for this round before everyone launches.'
@@ -542,6 +559,8 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     },
     showCountdown: (payload) => {
       openDialog();
+      setRoomCodeVisible(true);
+      setFriendsListLayout(FRIENDS_LIST_TITLE_Y, FRIENDS_LIST_START_Y, FRIENDS_LIST_HEIGHT);
       drawRoundedRect(
         roomCodeBackground,
         FRIENDS_CONTENT_WIDTH - ROOM_CODE_BUTTON_WIDTH - ROOM_CODE_BUTTON_GAP,
@@ -556,7 +575,6 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
       roomCodeText.text = `ROOM CODE ${payload.roomId}`;
       copyRoomCode = payload.roomId;
       resetCopyButton();
-      copyRoomCodeButton.view.visible = true;
       durationSection.visible = false;
       listTitle.text = `STARTING IN ${payload.countdownSeconds} SECONDS`;
       showFriendsRows([{ name: 'Get ready to flap', value: '...' }]);
@@ -566,6 +584,8 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     },
     showFriendsRunning: (summary) => {
       openDialog();
+      setRoomCodeVisible(true);
+      setFriendsListLayout(FRIENDS_LIST_TITLE_Y, FRIENDS_LIST_START_Y, FRIENDS_LIST_HEIGHT);
       drawRoundedRect(
         roomCodeBackground,
         FRIENDS_CONTENT_WIDTH - ROOM_CODE_BUTTON_WIDTH - ROOM_CODE_BUTTON_GAP,
@@ -580,7 +600,6 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
       roomCodeText.text = `ROOM CODE ${summary.roomId}`;
       copyRoomCode = summary.roomId;
       resetCopyButton();
-      copyRoomCodeButton.view.visible = true;
       durationSection.visible = false;
       listTitle.text = `DURATION ${summary.config.durationSeconds} SECONDS`;
       showFriendsRows([{ name: 'Room in progress', value: 'LIVE' }]);
@@ -590,13 +609,11 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
     },
     showFriendsFinished: (roomId, payload) => {
       openDialog();
-      drawRoundedRect(
-        roomCodeBackground,
-        FRIENDS_CONTENT_WIDTH - ROOM_CODE_BUTTON_WIDTH - ROOM_CODE_BUTTON_GAP,
-        ROOM_CODE_PILL_HEIGHT,
-        16,
-        0xffc443,
-        0.14,
+      setRoomCodeVisible(false);
+      setFriendsListLayout(
+        FRIENDS_FINISHED_LIST_TITLE_Y,
+        FRIENDS_FINISHED_LIST_START_Y,
+        FRIENDS_FINISHED_LIST_HEIGHT,
       );
       dialogBadge.text = 'Party';
       dialogTitle.text = 'Times Up';
@@ -604,7 +621,6 @@ export const createSessionPanel = (parent: Container): SessionPanelController =>
       roomCodeText.text = `ROOM CODE ${roomId}`;
       copyRoomCode = roomId;
       resetCopyButton();
-      copyRoomCodeButton.view.visible = true;
       durationSection.visible = false;
       listTitle.text = 'FINAL LEADERBOARD';
       showFriendsRows(payload.leaderboard.length > 0
