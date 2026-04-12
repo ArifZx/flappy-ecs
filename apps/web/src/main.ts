@@ -435,7 +435,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       }
     }
 
-    if (runtime.consumeScreenshotRequest() && activeMode === 'offline' && !mainMenu.isOpen()) {
+    if (runtime.consumeScreenshotRequest() && !mainMenu.isOpen()) {
       void captureShareImage().then((imageSrc) => {
         gameOverActions.setScreenshotSrc(imageSrc);
       });

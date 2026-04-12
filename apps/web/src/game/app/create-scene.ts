@@ -50,7 +50,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
       fontSize: 22,
       padding: 10,
       fill: 0xf6efc2,
-      stroke: { color: 0x1b2530, width: 3 },
+      stroke: { color: 0x1b2530, width: 1 },
     },
   });
   pointsText.anchor.set(0.5, 0);
