@@ -148,6 +148,26 @@ friendsRoomService = createFriendsRoomService({
 io.on('connection', (socket) => {
   const playerId = socket.id;
 
+  const clearAssignedSession = (): void => {
+    const assignment = socket.data.assignment
+      ? (socket.data.assignment as SessionAssignment)
+      : null;
+
+    if (!assignment) {
+      return;
+    }
+
+    if (assignment.mode === 'free-for-all') {
+      socket.leave(FFA_ROOM_ID);
+      ffaRoomService.handleDisconnect(playerId);
+    } else {
+      socket.leave(assignment.roomId);
+      friendsRoomService.handleDisconnect(playerId, assignment.roomId);
+    }
+
+    assignSocketSession(playerId, null);
+  };
+
   debugLog('socket connected', {
     playerId,
     transport: socket.conn.transport.name,
@@ -163,14 +183,17 @@ io.on('connection', (socket) => {
   });
 
   socket.on('ffa:join', ({ displayName }) => {
+    clearAssignedSession();
     ffaRoomService.join(playerId, displayName);
   });
 
   socket.on('room:create', ({ displayName, durationSeconds }) => {
+    clearAssignedSession();
     friendsRoomService.createRoom(playerId, displayName, durationSeconds);
   });
 
   socket.on('room:join', ({ roomId, displayName }) => {
+    clearAssignedSession();
     const error = friendsRoomService.joinRoom(playerId, roomId, displayName);
     if (error) {
       emitServerError(playerId, error);
