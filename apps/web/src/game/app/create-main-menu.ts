@@ -1,7 +1,8 @@
 import type { GameMode } from '@flappy/shared';
-import { Container, Graphics, Sprite, Text } from 'pixi.js';
+import { Container, Graphics, HTMLText, Sprite, Text } from 'pixi.js';
 import type { Texture } from 'pixi.js';
 
+import { isAudioMuted, setAudioMuted } from '../audio/sound';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/constants';
 import { DISPLAY_RESOLUTION } from '../config/display';
 import { UI_FONT_FAMILY } from '../config/font';
@@ -41,6 +42,7 @@ import {
 
 const PLAYER_NAME_STORAGE_KEY = 'flappy-party-player-name';
 const PLAYER_NAME_MAX_LENGTH = 20;
+const HTML_UI_FONT_FAMILY = 'Nunito, sans-serif';
 
 const clampDisplayName = (value: string): string => value.trim().slice(0, PLAYER_NAME_MAX_LENGTH);
 
@@ -246,6 +248,105 @@ export const createMainMenu = ({
   playMenu.position.set((GAME_WIDTH - playMenuWidth) / 2, 86);
   overlay.addChild(playMenu);
 
+  const infoDialog = new Container();
+  infoDialog.visible = false;
+  infoDialog.position.set((GAME_WIDTH - playMenuWidth) / 2, 118);
+  overlay.addChild(infoDialog);
+
+  const infoDialogBackground = new Graphics();
+  infoDialog.addChild(infoDialogBackground);
+
+  const infoDialogContent = new Container();
+  infoDialogContent.position.set(playMenuContentX, 18);
+  infoDialog.addChild(infoDialogContent);
+
+  const infoDialogTitle = new Text({
+    text: 'Options',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      ...dialogTitleStyle,
+      fontSize: 14,
+      fontWeight: '900',
+    },
+  });
+  infoDialogTitle.position.set(0, 0);
+  infoDialogContent.addChild(infoDialogTitle);
+
+  const infoDialogDescription = new Text({
+    text: '',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      ...bodyTextStyle,
+      fontSize: 9,
+      wordWrap: true,
+      wordWrapWidth: CONTROL_WIDTH - 8,
+    },
+  });
+  infoDialogDescription.position.set(0, 28);
+  infoDialogContent.addChild(infoDialogDescription);
+
+  const muteLabel = new Text({
+    text: 'AUDIO',
+    resolution: DISPLAY_RESOLUTION,
+    style: dialogTitleStyle,
+  });
+  muteLabel.position.set(0, 102);
+  infoDialogContent.addChild(muteLabel);
+
+  const muteSummary = new Text({
+    text: '',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      ...hintTextStyle,
+      align: 'left',
+      wordWrap: true,
+      wordWrapWidth: CONTROL_WIDTH - 8,
+    },
+  });
+  muteSummary.position.set(0, 126);
+  infoDialogContent.addChild(muteSummary);
+
+  const muteToggleButton = createUiButton('Mute: Off', CONTROL_WIDTH, 38, 9, neutralButtonTheme);
+  muteToggleButton.view.position.set(0, 166);
+  infoDialogContent.addChild(muteToggleButton.view);
+
+  const creditsText = new HTMLText({
+    text: '',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      ...bodyTextStyle,
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: 9,
+      wordWrap: true,
+      wordWrapWidth: CONTROL_WIDTH - 8,
+    },
+  });
+  creditsText.position.set(0, 102);
+  infoDialogContent.addChild(creditsText);
+
+  const creditsLinkText = new Text({
+    text: 'web.arifz.com',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      ...dialogTitleStyle,
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: 9,
+      fill: 0x7fe5ff,
+    },
+  });
+  creditsLinkText.position.set(0, 196);
+  creditsLinkText.eventMode = 'static';
+  creditsLinkText.cursor = 'pointer';
+  creditsLinkText.visible = false;
+  creditsLinkText.on('pointertap', () => {
+    window.open('https://web.arifz.com', '_blank', 'noopener,noreferrer');
+  });
+  infoDialogContent.addChild(creditsLinkText);
+
+  const infoCloseButton = createUiButton('Back', CONTROL_WIDTH, 38, 9, primaryButtonTheme);
+  infoCloseButton.view.position.set(0, 258);
+  infoDialogContent.addChild(infoCloseButton.view);
+
   const playMenuBackground = new Graphics();
   playMenu.addChild(playMenuBackground);
 
@@ -322,6 +423,65 @@ export const createMainMenu = ({
     status.text = message ?? '';
   };
 
+  const syncMuteButton = (): void => {
+    const muted = isAudioMuted();
+    muteToggleButton.setLabel(muted ? 'Mute: On' : 'Mute: Off');
+    muteSummary.text = muted
+      ? 'All sound effects are muted until you turn audio back on.'
+      : 'Sound effects are active for buttons, gameplay, and countdowns.';
+  };
+
+  const closeInfoDialog = (): void => {
+    infoDialog.visible = false;
+    panel.visible = true;
+    closePlayMenu();
+    setStatus(null);
+    syncMenu();
+  };
+
+  const openInfoDialog = (kind: 'options' | 'credits'): void => {
+    panel.visible = false;
+    playMenu.visible = false;
+    infoDialog.visible = true;
+    setStatus(null);
+    drawRoundedRect(infoDialogBackground, playMenuWidth, 320, PANEL_RADIUS, 0x10293a, 0.96, {
+      color: 0xffffff,
+      width: 2,
+      alpha: 0.14,
+    });
+
+    if (kind === 'options') {
+      infoDialogTitle.text = 'Options';
+      infoDialogDescription.text = 'Adjust your local menu and gameplay audio preferences.';
+      muteLabel.visible = true;
+      muteSummary.visible = true;
+      muteToggleButton.view.visible = true;
+      creditsText.visible = false;
+      creditsLinkText.visible = false;
+      infoCloseButton.view.position.set(0, 258);
+      syncMuteButton();
+      return;
+    }
+
+    infoDialogTitle.text = 'Credits';
+    infoDialogDescription.text = 'Asset credit for the classic FLAPPY PARTY! presentation.';
+    muteLabel.visible = false;
+    muteSummary.visible = false;
+    muteToggleButton.view.visible = false;
+    creditsText.visible = true;
+    creditsText.text = [
+      `<span style="font-family:${HTML_UI_FONT_FAMILY}; font-size:9px; color:#ece7c9;">`,
+      '<b>Game assets</b> by Samuel Custodio.',
+      '<br><br>',
+      '<b>FLAPPY PARTY!</b> project by ArifZ.',
+      '<br><br>',
+      'Visit the showcase here:',
+      '</span>',
+    ].join('');
+    creditsLinkText.visible = true;
+    infoCloseButton.view.position.set(0, 244);
+  };
+
   const syncMenu = (): void => {
     state.roomId = roomCodeInput.value;
     drawRoundedRect(playMenuBackground, playMenuWidth, playMenuHeight, PANEL_RADIUS, 0x10293a, 0.96, {
@@ -361,6 +521,7 @@ export const createMainMenu = ({
   const open = (): void => {
     overlay.visible = true;
     menuButton.view.visible = false;
+    infoDialog.visible = false;
     closePlayMenu();
     setStatus(null);
     syncMenu();
@@ -370,6 +531,7 @@ export const createMainMenu = ({
   const close = (): void => {
     overlay.visible = false;
     menuButton.view.visible = true;
+    infoDialog.visible = false;
     closePlayMenu();
     setStatus(null);
   };
@@ -420,11 +582,20 @@ export const createMainMenu = ({
   });
 
   optionsButton.button.onPress.connect(() => {
-    setStatus('Options belum dibuat.');
+    openInfoDialog('options');
   });
 
   creditsButton.button.onPress.connect(() => {
-    setStatus('Credits belum dibuat.');
+    openInfoDialog('credits');
+  });
+
+  muteToggleButton.button.onPress.connect(() => {
+    setAudioMuted(!isAudioMuted());
+    syncMuteButton();
+  });
+
+  infoCloseButton.button.onPress.connect(() => {
+    closeInfoDialog();
   });
 
   playCancelButton.button.onPress.connect(() => {
