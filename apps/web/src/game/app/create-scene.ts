@@ -19,6 +19,7 @@ export type GameScene = {
   groundB: Sprite;
   pointsText: Text;
   partyHudText: Text;
+  localPlayerNameText: Text;
   countdownSplashLabelText: Text;
   countdownSplashNumberText: Text;
   hintText: Text;
@@ -76,6 +77,23 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
   partyHudText.position.set(GAME_WIDTH / 2, 16);
   partyHudText.visible = false;
   container.addChild(partyHudText);
+
+  const localPlayerNameText = new Text({
+    text: 'Player',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: 8,
+      fontWeight: '700',
+      align: 'center',
+      padding: 4,
+      fill: 0xffd95e,
+      stroke: { color: 0x1b2530, width: 1 },
+    },
+  });
+  localPlayerNameText.anchor.set(0.5, 1);
+  localPlayerNameText.visible = false;
+  container.addChild(localPlayerNameText);
 
   const countdownSplashLabelText = new Text({
     text: 'STARTING',
@@ -152,6 +170,7 @@ export const createGameScene = (sheet: Spritesheet): GameScene => {
     groundB,
     pointsText,
     partyHudText,
+    localPlayerNameText,
     countdownSplashLabelText,
     countdownSplashNumberText,
     hintText,

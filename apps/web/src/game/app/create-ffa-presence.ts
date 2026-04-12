@@ -1,6 +1,9 @@
 import type { BirdVariant, NearbyPlayersSnapshot, PlayerSnapshot } from '@flappy/shared';
-import { Container, Sprite } from 'pixi.js';
+import { Container, Sprite, Text } from 'pixi.js';
 import type { Spritesheet } from 'pixi.js';
+
+import { DISPLAY_RESOLUTION } from '../config/display';
+import { UI_FONT_FAMILY } from '../config/font';
 
 type CreateFfaPresenceParams = {
   layer: Container;
@@ -8,7 +11,9 @@ type CreateFfaPresenceParams = {
 };
 
 type RemoteBirdRecord = {
+  container: Container;
   sprite: Sprite;
+  nameText: Text;
   frames: Sprite['texture'][];
   variant: BirdVariant;
   snapshot: PlayerSnapshot;
@@ -45,6 +50,15 @@ const resolveBirdTexture = (
   return frames[frameIndex];
 };
 
+const formatPlayerName = (displayName: string): string => {
+  const trimmed = displayName.trim();
+  if (trimmed.length <= 12) {
+    return trimmed || 'Player';
+  }
+
+  return `${trimmed.slice(0, 11)}...`;
+};
+
 export const createFfaPresence = ({
   layer,
   sheet,
@@ -57,7 +71,7 @@ export const createFfaPresence = ({
       return;
     }
 
-    record.sprite.destroy();
+    record.container.destroy({ children: true });
     remoteBirds.delete(playerId);
   };
 
@@ -71,13 +85,34 @@ export const createFfaPresence = ({
       destroyBird(snapshot.playerId);
     }
 
+    const container = new Container();
     const sprite = new Sprite();
     sprite.anchor.set(0.5);
-    sprite.alpha = 0.88;
-    layer.addChild(sprite);
+    sprite.alpha = 0.74;
+
+    const nameText = new Text({
+      text: formatPlayerName(snapshot.displayName),
+      resolution: DISPLAY_RESOLUTION,
+      style: {
+        fontFamily: UI_FONT_FAMILY,
+        fontSize: 8,
+        fontWeight: '700',
+        align: 'center',
+        padding: 4,
+        fill: 0x9cecff,
+        stroke: { color: 0x1b2530, width: 1 },
+      },
+    });
+    nameText.anchor.set(0.5, 1);
+    nameText.position.set(0, -22);
+
+    container.addChild(nameText, sprite);
+    layer.addChild(container);
 
     const record: RemoteBirdRecord = {
+      container,
       sprite,
+      nameText,
       frames: getBirdFrames(sheet, snapshot.variant),
       variant: snapshot.variant,
       snapshot,
@@ -100,16 +135,18 @@ export const createFfaPresence = ({
         const record = ensureBird(snapshot);
         record.snapshot = snapshot;
         record.sprite.texture = resolveBirdTexture(record.frames, snapshot);
-        record.sprite.position.set(record.snapshot.x, record.snapshot.y);
+        record.nameText.text = formatPlayerName(snapshot.displayName);
+        record.container.position.set(record.snapshot.x, record.snapshot.y);
         record.sprite.rotation = snapshot.rotation;
-        record.sprite.alpha = snapshot.alive ? 0.88 : 0.62;
-        record.sprite.visible = true;
+        record.sprite.alpha = snapshot.alive ? 0.74 : 0.5;
+        record.nameText.alpha = snapshot.alive ? 0.8 : 0.56;
+        record.container.visible = true;
       }
     },
     update: (_dt, localWorldOffset) => {
       for (const record of remoteBirds.values()) {
-        record.sprite.x = record.snapshot.x - localWorldOffset;
-        record.sprite.y = record.snapshot.y;
+        record.container.x = record.snapshot.x - localWorldOffset;
+        record.container.y = record.snapshot.y;
         record.sprite.rotation = record.snapshot.rotation;
       }
     },

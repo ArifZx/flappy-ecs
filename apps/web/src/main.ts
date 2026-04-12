@@ -381,7 +381,19 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   app.ticker.add(() => {
     const dt = Math.min(app.ticker.deltaMS / 1000, 1 / 30);
     runtime.update(dt);
-    ffaPresence.update(dt, runtime.getSnapshotState().worldOffset);
+    const snapshotState = runtime.getSnapshotState();
+    ffaPresence.update(dt, snapshotState.worldOffset);
+
+    const showLocalPlayerName = !mainMenu.isOpen();
+    scene.localPlayerNameText.visible = showLocalPlayerName;
+    if (showLocalPlayerName) {
+      const trimmedDisplayName = currentDisplayName.trim();
+      scene.localPlayerNameText.text = trimmedDisplayName.length <= 12
+        ? (trimmedDisplayName || 'Player')
+        : `${trimmedDisplayName.slice(0, 11)}...`;
+      scene.localPlayerNameText.position.set(snapshotState.screenX, snapshotState.screenY - 24);
+      scene.localPlayerNameText.alpha = 1;
+    }
 
     const showPartyHud = activeMode === 'friends' && gameplayEnabled && !mainMenu.isOpen();
     const showCountdownSplash = activeMode === 'friends'
@@ -428,6 +440,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     if (mainMenu.isOpen()) {
       scene.pointsText.visible = false;
       scene.partyHudText.visible = false;
+      scene.localPlayerNameText.visible = false;
       scene.countdownSplashLabelText.visible = false;
       scene.countdownSplashNumberText.visible = false;
       scene.hintText.visible = false;
@@ -448,7 +461,6 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 
       if (snapshotAccumulatorMs >= FFA_SNAPSHOT_INTERVAL_MS) {
         snapshotAccumulatorMs %= FFA_SNAPSHOT_INTERVAL_MS;
-        const snapshotState = runtime.getSnapshotState();
         const scoreTrigger: ScoreTrigger | undefined = snapshotState.score > lastSentScore
           ? {
               score: snapshotState.score,
@@ -482,16 +494,16 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       }
 
       if (phase === GamePhase.GameOver && !finishReported) {
-        const snapshotState = runtime.getSnapshotState();
+        const finalSnapshotState = runtime.getSnapshotState();
         finishReported = true;
-        const scoreTrigger: ScoreTrigger | undefined = snapshotState.score > lastSentScore
+        const scoreTrigger: ScoreTrigger | undefined = finalSnapshotState.score > lastSentScore
           ? {
-              score: snapshotState.score,
-              worldX: snapshotState.worldX,
-              screenY: snapshotState.screenY,
+              score: finalSnapshotState.score,
+              worldX: finalSnapshotState.worldX,
+              screenY: finalSnapshotState.screenY,
             }
           : undefined;
-        lastSentScore = Math.max(lastSentScore, snapshotState.score);
+        lastSentScore = Math.max(lastSentScore, finalSnapshotState.score);
         const roomId = activeMode === 'free-for-all' ? FFA_ROOM_ID : activeFriendsRoomId;
         if (!roomId) {
           return;
@@ -499,8 +511,8 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 
         multiplayer.finishRun({
           roomId,
-          progress: snapshotState.progress,
-          score: snapshotState.score,
+          progress: finalSnapshotState.progress,
+          score: finalSnapshotState.score,
           scoreTrigger,
         });
       }
