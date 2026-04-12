@@ -128,6 +128,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   let latestFfaState: RoomSummary | null = null;
   let latestLeaderboard: LeaderboardUpdate | null = null;
   let currentDisplayName = 'Player';
+  let pendingFfaAutoResume = false;
   let activeFriendsRoomId: string | null = null;
   let activeFriendsStartsAt: number | null = null;
   let activeFriendsEndsAt: number | null = null;
@@ -146,12 +147,15 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       applyOnlineCourseSeed(summary);
       if (activeMode === 'free-for-all') {
         sessionPanel.showFfa(summary, latestLeaderboard);
-        if (mainMenu.isOpen()) {
+        if (pendingFfaAutoResume) {
           gameplayEnabled = true;
           snapshotAccumulatorMs = 0;
           finishReported = false;
           runtime.restart();
-          mainMenu.close();
+          pendingFfaAutoResume = false;
+          if (mainMenu.isOpen()) {
+            mainMenu.close();
+          }
         }
       }
     },
@@ -262,6 +266,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 
   const resetToMenu = (): void => {
     gameplayEnabled = false;
+    pendingFfaAutoResume = false;
     activeFriendsRoomId = null;
     activeFriendsStartsAt = null;
     activeFriendsEndsAt = null;
@@ -294,6 +299,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 
       if (mode === 'free-for-all') {
         gameplayEnabled = false;
+        pendingFfaAutoResume = true;
         snapshotAccumulatorMs = 0;
         finishReported = false;
         lastSentScore = 0;
