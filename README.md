@@ -6,12 +6,53 @@ Live site: https://flappy.arifz.com/
 
 Repository: https://github.com/ArifZx/flappy-ecs
 
+## Docs
+
+- `docs/architecture.md`: broader project architecture notes
+- `docs/ffa-integration.md`: focused FFA multiplayer notes and implementation rules
+- `docs/server.md`: current multiplayer server behavior, event flow, and implementation limits
+
+Current multiplayer integrity model:
+
+- offline mode keeps a client-local deterministic pipe seed
+- online rooms use a server-generated seed for deterministic pipe generation
+- online score increments are validated on the server against the shared pipe-map rules
+
+## Workspace Layout
+
+```text
+apps/
+	web/       # Vite client game
+	server/    # Multiplayer/session server scaffold
+packages/
+	shared/    # Shared multiplayer types and protocol contracts
+```
+
 ## Development
+
+Environment config:
+
+- `apps/server/.env` for the multiplayer server
+- `apps/web/.env` for the Vite client
+
+Available variables:
+
+- `PORT` defaults to `3001`
+- `CORS_ORIGINS` defaults to `https://flappy.arifz.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173`
+- `VITE_SERVER_URL` defaults to `http://localhost:3001`
 
 ```bash
 pnpm install
 pnpm dev
 ```
+
+Run the server scaffold separately when needed:
+
+```bash
+pnpm dev:server
+```
+
+The server loads `.env` automatically via `dotenv`. The web app reads Vite variables from `import.meta.env`.
 
 ## Build
 
