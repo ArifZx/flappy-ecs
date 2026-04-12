@@ -27,6 +27,7 @@ const SHARE_WIDTH = 1080;
 const SHARE_HEIGHT = 1080;
 const SHARE_ASPECT_RATIO = 1 / 1;
 const SHARE_ZOOM = 1.04;
+const SHARE_BRAND_TITLE = 'FLAPPY PARTY!';
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -164,6 +165,28 @@ const drawShareLogo = (context: CanvasRenderingContext2D, logoImage: CanvasImage
   context.restore();
 };
 
+const drawShareBrand = (context: CanvasRenderingContext2D): void => {
+  const brandX = 184;
+  const brandY = SHARE_HEIGHT - 112;
+
+  context.save();
+  context.textAlign = 'left';
+  context.textBaseline = 'middle';
+  context.fillStyle = '#f8efc7';
+  context.shadowColor = 'rgba(8, 18, 29, 0.8)';
+  context.shadowBlur = 0;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 4;
+  context.font = `900 48px ${UI_FONT_FAMILY}, sans-serif`;
+  context.fillText(SHARE_BRAND_TITLE, brandX, brandY);
+
+  context.shadowColor = 'transparent';
+  context.fillStyle = 'rgba(248, 239, 199, 0.86)';
+  context.font = `700 22px ${UI_FONT_FAMILY}, sans-serif`;
+  context.fillText('Tap in. Flap hard. Party louder.', brandX, brandY + 50);
+  context.restore();
+};
+
 const captureViewportCanvas = (app: Application, scene: GameScene): HTMLCanvasElement => {
   const previousPointsVisible = scene.pointsText.visible;
   const previousHintVisible = scene.hintText.visible;
@@ -235,6 +258,7 @@ const composeShareImage = ({
   if (logoImage) {
     drawShareLogo(outputContext, logoImage);
   }
+  drawShareBrand(outputContext);
 
   return outputCanvas.toDataURL('image/png');
 };

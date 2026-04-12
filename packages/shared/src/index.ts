@@ -85,6 +85,11 @@ export type RoomConfigUpdateRequest = {
   durationSeconds: number;
 };
 
+export type RoomKickRequest = {
+  roomId: RoomId;
+  targetPlayerId: PlayerId;
+};
+
 export type FfaJoinRequest = {
   displayName: string;
 };
@@ -122,6 +127,11 @@ export type RoomFinished = {
   leaderboard: LeaderboardEntry[];
 };
 
+export type RoomKicked = {
+  roomId: RoomId;
+  message: string;
+};
+
 export type LeaderboardUpdate = {
   roomId: RoomId;
   maxScore: number;
@@ -137,6 +147,7 @@ export type ClientToServerEvents = {
   'room:join': (payload: RoomJoinRequest) => void;
   'room:start': (payload: RoomStartRequest) => void;
   'room:update-config': (payload: RoomConfigUpdateRequest) => void;
+  'room:kick': (payload: RoomKickRequest) => void;
   'ffa:join': (payload: FfaJoinRequest) => void;
   'system:ping': (payload: PingRequest) => void;
   'player:update': (payload: PlayerUpdateRequest) => void;
@@ -150,6 +161,7 @@ export type ServerToClientEvents = {
   'room:state': (payload: RoomSummary) => void;
   'room:countdown': (payload: RoomCountdown) => void;
   'room:finished': (payload: RoomFinished) => void;
+  'room:kicked': (payload: RoomKicked) => void;
   'ffa:state': (payload: RoomSummary) => void;
   'system:pong': (payload: PongPayload) => void;
   'players:nearby': (payload: NearbyPlayersSnapshot) => void;

@@ -33,17 +33,24 @@ export type MainMenuState = {
   durationSeconds: number;
 };
 
-export const PANEL_WIDTH = 248;
+type MenuInputAlign = 'left' | 'center' | 'right';
+
+type MenuInputOptions = {
+  align?: MenuInputAlign;
+  withBackground?: boolean;
+};
+
+export const PANEL_WIDTH = 220;
 export const PANEL_RADIUS = 28;
 export const CONTROL_WIDTH = PANEL_WIDTH - 28;
-export const INPUT_HEIGHT = 42;
-export const PRIMARY_BUTTON_HEIGHT = 48;
-export const MODE_BUTTON_WIDTH = 70;
+export const INPUT_HEIGHT = 38;
+export const PRIMARY_BUTTON_HEIGHT = 42;
+export const MODE_BUTTON_SPACING = 6;
+export const MODE_BUTTON_WIDTH = Math.floor((CONTROL_WIDTH - MODE_BUTTON_SPACING * 2) / 3);
 export const MODE_BUTTON_HEIGHT = 40;
 export const DIALOG_HEIGHT = 276;
 export const MENU_BUTTON_WIDTH = 84;
 export const MENU_BUTTON_HEIGHT = 34;
-export const MODE_BUTTON_SPACING = 5;
 export const DURATION_OPTIONS = [45, 60, 90, 120] as const;
 
 export const MODE_CONFIGS: Array<{ mode: GameMode; label: string; fontSize: number }> = [
@@ -58,13 +65,16 @@ const sectionTextStyle = {
   fontWeight: '700',
   fill: 0xf2e8b6,
   letterSpacing: 0,
+  padding: 2,
+  stroke: { color: 0x163447, width: 1 },
 } as const;
 
 const inputTextStyle = {
   fontFamily: UI_FONT_FAMILY,
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: '700',
   fill: 0xf4efcf,
+  align: 'center',
 } as const;
 
 export const bodyTextStyle = {
@@ -240,12 +250,17 @@ export const createUiButton = (
   };
 };
 
-const createInputBackground = (width: number, height: number): Graphics => {
+const createInputBackground = (
+  width: number,
+  height: number,
+  strokeAlpha = 0.16,
+  fillAlpha = 0.94,
+): Graphics => {
   const background = new Graphics();
-  drawRoundedRect(background, width, height, 18, 0x10293a, 0.94, {
+  drawRoundedRect(background, width, height, 18, 0x10293a, fillAlpha, {
     color: 0xffffff,
     width: 2,
-    alpha: 0.16,
+    alpha: strokeAlpha,
   });
   return background;
 };
@@ -257,14 +272,32 @@ export const createSectionLabel = (text: string): Text =>
     style: sectionTextStyle,
   });
 
-export const createMenuInput = (value: string, placeholder: string, maxLength: number): Input => {
+export const createMenuInput = (
+  value: string,
+  placeholder: string,
+  maxLength: number,
+  options: MenuInputOptions = {},
+): Input => {
+  const {
+    align = 'left',
+    withBackground = true,
+  } = options;
+
   const input = new Input({
-    bg: createInputBackground(CONTROL_WIDTH, INPUT_HEIGHT),
+    bg: createInputBackground(
+      CONTROL_WIDTH,
+      INPUT_HEIGHT,
+      withBackground ? 0.16 : 0,
+      withBackground ? 0.94 : 0,
+    ),
     value,
     placeholder,
     maxLength,
+    align,
     addMask: true,
-    padding: { top: 13, right: 12, bottom: 9, left: 12 },
+    padding: align === 'center'
+      ? { top: 10, right: 0, bottom: 10, left: 0 }
+      : { top: 10, right: 12, bottom: 10, left: 12 },
     textStyle: inputTextStyle,
   });
   input.width = CONTROL_WIDTH;

@@ -11,6 +11,8 @@ import type {
   RoomCountdown,
   RoomConfigUpdateRequest,
   RoomCreateRequest,
+  RoomFinished,
+  RoomKicked,
   RoomLobbyState,
   RoomJoinRequest,
   RoomSummary,
@@ -24,6 +26,8 @@ export type MultiplayerClientCallbacks = {
   onLobbyState: (state: RoomLobbyState) => void;
   onNearbyPlayers: (payload: NearbyPlayersSnapshot) => void;
   onCountdown: (payload: RoomCountdown) => void;
+  onRoomFinished: (payload: RoomFinished) => void;
+  onRoomKicked: (payload: RoomKicked) => void;
   onLeaderboard: (payload: LeaderboardUpdate) => void;
   onError: (payload: ServerErrorPayload) => void;
 };
@@ -34,6 +38,7 @@ export type MultiplayerClient = {
   joinFriendsRoom: (payload: RoomJoinRequest) => void;
   updateFriendsRoomConfig: (payload: RoomConfigUpdateRequest) => void;
   startFriendsRoom: (roomId: string) => void;
+  kickFriendsPlayer: (roomId: string, targetPlayerId: string) => void;
   sendPlayerUpdate: (payload: PlayerUpdateRequest) => void;
   finishRun: (payload: PlayerFinishRequest) => void;
   measureRtt: (label?: string) => Promise<number | null>;
@@ -48,6 +53,8 @@ export const createMultiplayerClient = ({
   onLobbyState,
   onNearbyPlayers,
   onCountdown,
+  onRoomFinished,
+  onRoomKicked,
   onLeaderboard,
   onError,
 }: MultiplayerClientCallbacks): MultiplayerClient => {
@@ -69,6 +76,8 @@ export const createMultiplayerClient = ({
     socket.on('room:state', onFriendsSummary);
     socket.on('room:lobby', onLobbyState);
     socket.on('room:countdown', onCountdown);
+    socket.on('room:finished', onRoomFinished);
+    socket.on('room:kicked', onRoomKicked);
     socket.on('players:nearby', onNearbyPlayers);
     socket.on('leaderboard:update', onLeaderboard);
     socket.on('server:error', onError);
@@ -91,6 +100,9 @@ export const createMultiplayerClient = ({
     },
     startFriendsRoom: (roomId) => {
       getSocket().emit('room:start', { roomId });
+    },
+    kickFriendsPlayer: (roomId, targetPlayerId) => {
+      getSocket().emit('room:kick', { roomId, targetPlayerId });
     },
     sendPlayerUpdate: (payload) => {
       getSocket().emit('player:update', payload);

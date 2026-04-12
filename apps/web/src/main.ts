@@ -4,6 +4,8 @@ import type {
   GameMode,
   LeaderboardUpdate,
   NearbyPlayersSnapshot,
+  RoomFinished,
+  RoomKicked,
   RoomSummary,
 } from '@flappy/shared';
 import { Application, Assets, Container, Graphics } from 'pixi.js';
@@ -115,12 +117,15 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     parent: rootHost,
     onRestart: runtime.restart,
   });
+  let mainMenu: ReturnType<typeof createMainMenu>;
   let activeMode: GameMode = 'offline';
   let gameplayEnabled = false;
   let latestFfaState: RoomSummary | null = null;
   let latestLeaderboard: LeaderboardUpdate | null = null;
   let currentDisplayName = 'Player';
   let activeFriendsRoomId: string | null = null;
+  let activeFriendsEndsAt: number | null = null;
+  let activeFriendsDurationSeconds = 0;
   let snapshotAccumulatorMs = 0;
   let finishReported = false;
 
@@ -146,29 +151,69 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       activeFriendsRoomId = summary.roomId;
 
       if (summary.status === 'running') {
+        activeFriendsEndsAt = summary.endsAt ?? null;
+        activeFriendsDurationSeconds = summary.config.durationSeconds;
         gameplayEnabled = true;
         runtime.restart();
-        sessionPanel.showFriendsRunning(summary);
+        sessionPanel.hide();
       }
     },
     onLobbyState: (state) => {
       if (activeMode === 'friends') {
         activeFriendsRoomId = state.room.roomId;
-        gameplayEnabled = false;
-        sessionPanel.showFriendsLobby(state);
         mainMenu.close();
+
+        if (state.room.status !== 'waiting') {
+          return;
+        }
+
+        activeFriendsEndsAt = null;
+        activeFriendsDurationSeconds = state.room.config.durationSeconds;
+        gameplayEnabled = false;
+        ffaPresence.clear();
+        sessionPanel.showFriendsLobby(state);
       }
     },
     onNearbyPlayers: (payload: NearbyPlayersSnapshot) => {
-      if (activeMode === 'free-for-all') {
+      if (activeMode === 'free-for-all' || (activeMode === 'friends' && gameplayEnabled)) {
         ffaPresence.sync(payload);
       }
     },
     onCountdown: (payload) => {
       if (activeMode === 'friends') {
         activeFriendsRoomId = payload.roomId;
+        activeFriendsEndsAt = payload.startsAt + payload.countdownSeconds * 1000;
+        ffaPresence.clear();
         sessionPanel.showCountdown(payload);
       }
+    },
+    onRoomFinished: (payload: RoomFinished) => {
+      if (activeMode !== 'friends') {
+        return;
+      }
+
+      gameplayEnabled = false;
+      activeFriendsEndsAt = null;
+      gameOverActions.setVisible(false);
+      gameOverActions.setScreenshotSrc(null);
+      ffaPresence.clear();
+      sessionPanel.showFriendsFinished(activeFriendsRoomId ?? payload.roomId, payload);
+    },
+    onRoomKicked: ({ message }: RoomKicked) => {
+      gameplayEnabled = false;
+      activeMode = 'offline';
+      activeFriendsRoomId = null;
+      activeFriendsEndsAt = null;
+      activeFriendsDurationSeconds = 0;
+      snapshotAccumulatorMs = 0;
+      finishReported = false;
+      ffaPresence.clear();
+      sessionPanel.hide();
+      gameOverActions.setVisible(false);
+      gameOverActions.setScreenshotSrc(null);
+      runtime.restart();
+      mainMenu.open();
+      mainMenu.setStatus(message);
     },
     onLeaderboard: (payload) => {
       latestLeaderboard = payload;
@@ -192,9 +237,15 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     });
   });
 
+  sessionPanel.setKickHandler((roomId, targetPlayerId) => {
+    multiplayer.kickFriendsPlayer(activeFriendsRoomId ?? roomId, targetPlayerId);
+  });
+
   const resetToMenu = (): void => {
     gameplayEnabled = false;
     activeFriendsRoomId = null;
+    activeFriendsEndsAt = null;
+    activeFriendsDurationSeconds = 0;
     snapshotAccumulatorMs = 0;
     finishReported = false;
     runtime.restart();
@@ -204,7 +255,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     sessionPanel.hide();
   };
 
-  const mainMenu = createMainMenu({
+  mainMenu = createMainMenu({
     parent: gameRoot,
     onOpen: resetToMenu,
     onStart: async ({ mode, displayName, roomId, durationSeconds }) => {
@@ -213,6 +264,8 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       latestFfaState = null;
       latestLeaderboard = null;
       activeFriendsRoomId = mode === 'friends' ? roomId || null : null;
+      activeFriendsEndsAt = null;
+      activeFriendsDurationSeconds = mode === 'friends' ? durationSeconds : 0;
       ffaPresence.clear();
 
       if (mode === 'free-for-all') {
@@ -302,8 +355,19 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     runtime.update(dt);
     ffaPresence.update(dt, runtime.getSnapshotState().worldOffset);
 
+    const showPartyHud = activeMode === 'friends' && gameplayEnabled && !mainMenu.isOpen();
+    scene.partyHudText.visible = showPartyHud;
+    scene.pointsText.visible = !showPartyHud;
+    if (showPartyHud) {
+      const remainingSeconds = activeFriendsEndsAt === null
+        ? activeFriendsDurationSeconds
+        : Math.max(0, Math.ceil((activeFriendsEndsAt - Date.now()) / 1000));
+      scene.partyHudText.text = `PARTY\n${remainingSeconds}`;
+    }
+
     if (mainMenu.isOpen()) {
       scene.pointsText.visible = false;
+      scene.partyHudText.visible = false;
       scene.hintText.visible = false;
       scene.gameOverSprite.visible = false;
     }
@@ -317,14 +381,19 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       lastPhase = phase;
     }
 
-    if (activeMode === 'free-for-all' && gameplayEnabled && !mainMenu.isOpen()) {
+    if ((activeMode === 'free-for-all' || activeMode === 'friends') && gameplayEnabled && !mainMenu.isOpen()) {
       snapshotAccumulatorMs += app.ticker.deltaMS;
 
       if (snapshotAccumulatorMs >= FFA_SNAPSHOT_INTERVAL_MS) {
         snapshotAccumulatorMs %= FFA_SNAPSHOT_INTERVAL_MS;
         const snapshotState = runtime.getSnapshotState();
+        const roomId = activeMode === 'free-for-all' ? FFA_ROOM_ID : activeFriendsRoomId;
+        if (!roomId) {
+          return;
+        }
+
         multiplayer.sendPlayerUpdate({
-          roomId: FFA_ROOM_ID,
+          roomId,
           snapshot: {
             playerId: '',
             displayName: currentDisplayName,
@@ -344,8 +413,13 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       if (phase === GamePhase.GameOver && !finishReported) {
         const snapshotState = runtime.getSnapshotState();
         finishReported = true;
+        const roomId = activeMode === 'free-for-all' ? FFA_ROOM_ID : activeFriendsRoomId;
+        if (!roomId) {
+          return;
+        }
+
         multiplayer.finishRun({
-          roomId: FFA_ROOM_ID,
+          roomId,
           progress: snapshotState.progress,
           score: snapshotState.score,
         });

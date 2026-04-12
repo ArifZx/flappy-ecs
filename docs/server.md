@@ -17,6 +17,10 @@ The server is not authoritative for gameplay simulation yet. Clients still run l
 ## File Locations
 
 - [apps/server/src/index.ts](apps/server/src/index.ts): current server implementation
+- [apps/server/src/rooms/ffa-room-service.ts](apps/server/src/rooms/ffa-room-service.ts): dedicated FFA room handling
+- [apps/server/src/rooms/friends-room-service.ts](apps/server/src/rooms/friends-room-service.ts): dedicated party or friends room handling
+- [apps/server/src/server/config.ts](apps/server/src/server/config.ts): shared server constants and environment-derived config
+- [apps/server/src/server/types.ts](apps/server/src/server/types.ts): shared server-only room and player types
 - [apps/server/package.json](apps/server/package.json): dev, build, and start scripts
 - [packages/shared/src/index.ts](packages/shared/src/index.ts): shared event and payload contracts
 
@@ -86,6 +90,13 @@ Each socket receives an active session assignment:
 - `friends`
 
 That assignment is used during disconnect handling so the server can clean up the correct room.
+
+Implementation-wise, the server is now split into two dedicated room services:
+
+- the FFA service owns global arena state, nearby-player snapshots, leaderboard broadcast, and idle shutdown
+- the friends service owns party room creation, lobby state, host reassignment, countdown, finish timing, and final leaderboard emission
+
+The monitor endpoint still aggregates both services into one response.
 
 ## Important Constants
 

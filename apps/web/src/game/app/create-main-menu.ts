@@ -7,6 +7,7 @@ import { UI_FONT_FAMILY } from '../config/font';
 import {
   CONTROL_WIDTH,
   dialogTitleStyle,
+  INPUT_HEIGHT,
   MENU_BUTTON_HEIGHT,
   MENU_BUTTON_WIDTH,
   MODE_BUTTON_HEIGHT,
@@ -58,14 +59,18 @@ export const createMainMenu = ({
   onStart,
   onOpen,
 }: CreateMainMenuParams): MainMenuController => {
-  const playMenuWidth = GAME_WIDTH - 18;
-  const playMenuHeight = GAME_HEIGHT - 86;
+  const controlOffsetX = (PANEL_WIDTH - CONTROL_WIDTH) / 2;
+  const compactButtonGap = 8;
+  const actionButtonGap = 10;
+  const actionButtonWidth = Math.floor((CONTROL_WIDTH - actionButtonGap) / 2);
+  const playMenuWidth = GAME_WIDTH - 28;
+  const playMenuHeight = GAME_HEIGHT - 110;
   const playMenuPaddingTop = 18;
   const playMenuContentX = (playMenuWidth - CONTROL_WIDTH) / 2;
 
   const state: MainMenuState = {
     mode: 'offline',
-    displayName: 'Player',
+    displayName: '',
     roomId: '',
     durationSeconds: 60,
   };
@@ -75,22 +80,48 @@ export const createMainMenu = ({
   parent.addChild(overlay);
 
   const title = new Text({
-    text: 'Flappy ECS',
+    text: 'FLAPPY PARTY!',
     resolution: DISPLAY_RESOLUTION,
     style: {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: 20,
-      fontWeight: '700',
-      fill: 0xf6efc2,
-      stroke: { color: 0x1b2530, width: 3 },
+      fontSize: 32,
+      fontWeight: '900',
+      fill: '#ffe08a',
+      letterSpacing: 1.4,
+      padding: 8,
+      stroke: { color: 0x1c2b38, width: 2 },
+      dropShadow: {
+        alpha: 0.46,
+        angle: 1.5708,
+        blur: 0,
+        color: 0x6b4e16,
+        distance: 5,
+      },
     },
   });
   title.anchor.set(0.5, 0);
-  title.position.set(GAME_WIDTH / 2, 54);
+  title.position.set(GAME_WIDTH / 2, 38);
   overlay.addChild(title);
 
+  const subtitle = new Text({
+    text: 'Bring friends. Flap hard. Own the room.',
+    resolution: DISPLAY_RESOLUTION,
+    style: {
+      ...hintTextStyle,
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: 10,
+      fontWeight: '800',
+      fill: 0xfff3cf,
+      letterSpacing: 0.6,
+      stroke: { color: 0x1c2b38, width: 1 },
+    },
+  });
+  subtitle.anchor.set(0.5, 0);
+  subtitle.position.set(GAME_WIDTH / 2, 84);
+  overlay.addChild(subtitle);
+
   const panel = new Container();
-  panel.position.set((GAME_WIDTH - PANEL_WIDTH) / 2, 154);
+  panel.position.set((GAME_WIDTH - PANEL_WIDTH) / 2, 180);
   overlay.addChild(panel);
 
   const nameLabel = createSectionLabel('PLAYER NAME');
@@ -98,23 +129,35 @@ export const createMainMenu = ({
   nameLabel.position.set(PANEL_WIDTH / 2, 0);
   panel.addChild(nameLabel);
 
-  const playerNameInput = createMenuInput(state.displayName, 'Player', 16);
-  playerNameInput.position.set(14, 24);
+  const playerNameInput = createMenuInput(state.displayName, 'Player', 16, {
+    align: 'center',
+    withBackground: false,
+  });
+  playerNameInput.position.set(controlOffsetX, 24);
   panel.addChild(playerNameInput);
 
+  const playerNameUnderline = new Graphics();
+  drawRoundedRect(playerNameUnderline, CONTROL_WIDTH - 40, 3, 999, 0xffe08a, 0.9, {
+    color: 0x1c2b38,
+    width: 1,
+    alpha: 0.2,
+  });
+  playerNameUnderline.position.set(controlOffsetX + 20, 24 + INPUT_HEIGHT - 4);
+  panel.addChild(playerNameUnderline);
+
   const menuButtons = new Container();
-  menuButtons.position.set(14, 84);
+  menuButtons.position.set(controlOffsetX, 74);
   panel.addChild(menuButtons);
 
   const playButton = createUiButton('Play', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 12, primaryButtonTheme);
   menuButtons.addChild(playButton.view);
 
   const optionsButton = createUiButton('Options', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 10, neutralButtonTheme);
-  optionsButton.view.position.set(0, PRIMARY_BUTTON_HEIGHT + 10);
+  optionsButton.view.position.set(0, PRIMARY_BUTTON_HEIGHT + compactButtonGap);
   menuButtons.addChild(optionsButton.view);
 
   const creditsButton = createUiButton('Credits', CONTROL_WIDTH, PRIMARY_BUTTON_HEIGHT, 10, neutralButtonTheme);
-  creditsButton.view.position.set(0, (PRIMARY_BUTTON_HEIGHT + 10) * 2);
+  creditsButton.view.position.set(0, (PRIMARY_BUTTON_HEIGHT + compactButtonGap) * 2);
   menuButtons.addChild(creditsButton.view);
 
   const status = new Text({
@@ -133,7 +176,7 @@ export const createMainMenu = ({
 
   const playMenu = new Container();
   playMenu.visible = false;
-  playMenu.position.set((GAME_WIDTH - playMenuWidth) / 2, 72);
+  playMenu.position.set((GAME_WIDTH - playMenuWidth) / 2, 86);
   overlay.addChild(playMenu);
 
   const playMenuBackground = new Graphics();
@@ -187,10 +230,10 @@ export const createMainMenu = ({
   roomHint.position.set(0, 232);
   playMenuContent.addChild(roomHint);
 
-  const playCancelButton = createUiButton('Cancel', 88, 36, 9, neutralButtonTheme);
+  const playCancelButton = createUiButton('Cancel', actionButtonWidth, 36, 9, neutralButtonTheme);
   playCancelButton.view.position.set(0, 314);
-  const playConfirmButton = createUiButton('Continue', 110, 36, 9, primaryButtonTheme);
-  playConfirmButton.view.position.set(CONTROL_WIDTH - 110, 314);
+  const playConfirmButton = createUiButton('Continue', actionButtonWidth, 36, 9, primaryButtonTheme);
+  playConfirmButton.view.position.set(actionButtonWidth + actionButtonGap, 314);
   playMenuContent.addChild(playCancelButton.view, playConfirmButton.view);
 
   const modeButtons: Array<{ mode: GameMode; controller: UiButtonController }> = [];
@@ -229,7 +272,7 @@ export const createMainMenu = ({
     } else {
       playConfirmButton.setLabel(sanitizeRoomId(state.roomId) ? 'Join Party' : 'Open Room');
     }
-    status.position.set(GAME_WIDTH / 2, playMenu.visible ? playMenu.y + playMenuHeight - 14 : panel.y + 236);
+    status.position.set(GAME_WIDTH / 2, playMenu.visible ? playMenu.y + playMenuHeight - 14 : panel.y + 208);
 
     for (const entry of modeButtons) {
       entry.controller.setTheme(entry.mode === state.mode ? MODE_BUTTON_THEMES[entry.mode] : MODE_INACTIVE_THEME);
@@ -238,11 +281,13 @@ export const createMainMenu = ({
 
   const closePlayMenu = (): void => {
     playMenu.visible = false;
+    panel.visible = true;
     syncMenu();
   };
 
   const openPlayMenu = (): void => {
     playMenu.visible = true;
+    panel.visible = false;
     syncMenu();
   };
 
