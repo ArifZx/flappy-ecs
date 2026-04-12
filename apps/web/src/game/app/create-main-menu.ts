@@ -1,9 +1,14 @@
 import type { GameMode } from '@flappy/shared';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, Text } from 'pixi.js';
+import type { Texture } from 'pixi.js';
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/constants';
 import { DISPLAY_RESOLUTION } from '../config/display';
 import { UI_FONT_FAMILY } from '../config/font';
+import {
+  RANDOM_PLAYER_FIRST_NAMES,
+  RANDOM_PLAYER_LAST_NAMES,
+} from '../config/player-names';
 import {
   CONTROL_WIDTH,
   dialogTitleStyle,
@@ -32,7 +37,53 @@ import {
   statusTextStyle,
   type MainMenuState,
   type UiButtonController,
-} from '../ui/main-menu-ui.ts';
+} from '../ui/main-menu-ui';
+
+const PLAYER_NAME_STORAGE_KEY = 'flappy-party-player-name';
+const PLAYER_NAME_MAX_LENGTH = 20;
+
+const clampDisplayName = (value: string): string => value.trim().slice(0, PLAYER_NAME_MAX_LENGTH);
+
+const loadStoredDisplayName = (): string => {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return clampDisplayName(window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '');
+};
+
+const storeDisplayName = (value: string): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const trimmedValue = clampDisplayName(value);
+  if (!trimmedValue) {
+    window.localStorage.removeItem(PLAYER_NAME_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, trimmedValue);
+};
+
+const pickRandomDisplayName = (currentValue: string): string => {
+  const currentName = currentValue.trim().toLowerCase();
+
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const firstName = RANDOM_PLAYER_FIRST_NAMES[
+      Math.floor(Math.random() * RANDOM_PLAYER_FIRST_NAMES.length)
+    ];
+    const lastName = RANDOM_PLAYER_LAST_NAMES[
+      Math.floor(Math.random() * RANDOM_PLAYER_LAST_NAMES.length)
+    ];
+    const candidate = clampDisplayName(`${firstName} ${lastName}`);
+    if (candidate && candidate.toLowerCase() !== currentName) {
+      return candidate;
+    }
+  }
+
+  return 'Player';
+};
 
 export type MainMenuStartRequest = {
   mode: GameMode;
@@ -43,6 +94,7 @@ export type MainMenuStartRequest = {
 
 type CreateMainMenuParams = {
   parent: Container;
+  diceTexture: Texture;
   onStart: (request: MainMenuStartRequest) => void;
   onOpen: () => void;
 };
@@ -56,6 +108,7 @@ export type MainMenuController = {
 
 export const createMainMenu = ({
   parent,
+  diceTexture,
   onStart,
   onOpen,
 }: CreateMainMenuParams): MainMenuController => {
@@ -63,6 +116,9 @@ export const createMainMenu = ({
   const compactButtonGap = 8;
   const actionButtonGap = 10;
   const actionButtonWidth = Math.floor((CONTROL_WIDTH - actionButtonGap) / 2);
+  const randomButtonSize = 32;
+  const randomButtonGap = 8;
+  const playerNameInputWidth = CONTROL_WIDTH - randomButtonSize - randomButtonGap;
   const playMenuWidth = GAME_WIDTH - 28;
   const playMenuHeight = GAME_HEIGHT - 110;
   const playMenuPaddingTop = 18;
@@ -70,7 +126,7 @@ export const createMainMenu = ({
 
   const state: MainMenuState = {
     mode: 'offline',
-    displayName: '',
+    displayName: loadStoredDisplayName(),
     roomId: '',
     durationSeconds: 60,
   };
@@ -129,21 +185,32 @@ export const createMainMenu = ({
   nameLabel.position.set(PANEL_WIDTH / 2, 0);
   panel.addChild(nameLabel);
 
-  const playerNameInput = createMenuInput(state.displayName, 'Player', 16, {
+  const playerNameInput = createMenuInput(state.displayName, 'Player', PLAYER_NAME_MAX_LENGTH, {
     align: 'center',
     withBackground: false,
+    width: playerNameInputWidth,
   });
   playerNameInput.position.set(controlOffsetX, 24);
   panel.addChild(playerNameInput);
 
   const playerNameUnderline = new Graphics();
-  drawRoundedRect(playerNameUnderline, CONTROL_WIDTH - 40, 3, 999, 0xffe08a, 0.9, {
+  drawRoundedRect(playerNameUnderline, playerNameInputWidth - 20, 3, 999, 0xffe08a, 0.9, {
     color: 0x1c2b38,
     width: 1,
     alpha: 0.2,
   });
-  playerNameUnderline.position.set(controlOffsetX + 20, 24 + INPUT_HEIGHT - 4);
+  playerNameUnderline.position.set(controlOffsetX + 10, 24 + INPUT_HEIGHT - 4);
   panel.addChild(playerNameUnderline);
+
+  const randomNameButton = createUiButton('', randomButtonSize, randomButtonSize, 8, neutralButtonTheme);
+  randomNameButton.view.position.set(controlOffsetX + playerNameInputWidth + randomButtonGap, 27);
+  const randomNameIcon = new Sprite(diceTexture);
+  randomNameIcon.anchor.set(0.5);
+  randomNameIcon.width = 16;
+  randomNameIcon.height = 16;
+  randomNameIcon.position.set(randomButtonSize / 2, randomButtonSize / 2);
+  randomNameButton.view.addChild(randomNameIcon);
+  panel.addChild(randomNameButton.view);
 
   const menuButtons = new Container();
   menuButtons.position.set(controlOffsetX, 74);
@@ -308,12 +375,23 @@ export const createMainMenu = ({
   };
 
   playerNameInput.onChange.connect((value: string) => {
-    state.displayName = value;
+    state.displayName = clampDisplayName(value);
+    if (state.displayName !== value) {
+      playerNameInput.value = state.displayName;
+    }
+    storeDisplayName(state.displayName);
   });
 
   playerNameInput.onEnter.connect((value: string) => {
-    state.displayName = sanitizeDisplayName(value);
+    state.displayName = clampDisplayName(sanitizeDisplayName(value));
     playerNameInput.value = state.displayName;
+    storeDisplayName(state.displayName);
+  });
+
+  randomNameButton.button.onPress.connect(() => {
+    state.displayName = pickRandomDisplayName(state.displayName);
+    playerNameInput.value = state.displayName;
+    storeDisplayName(state.displayName);
   });
 
   roomCodeInput.onChange.connect((value: string) => {
@@ -335,8 +413,9 @@ export const createMainMenu = ({
   }
 
   playButton.button.onPress.connect(() => {
-    state.displayName = sanitizeDisplayName(state.displayName);
+    state.displayName = clampDisplayName(sanitizeDisplayName(state.displayName));
     playerNameInput.value = state.displayName;
+    storeDisplayName(state.displayName);
     openPlayMenu();
   });
 
@@ -353,10 +432,11 @@ export const createMainMenu = ({
   });
 
   playConfirmButton.button.onPress.connect(() => {
-    state.displayName = sanitizeDisplayName(state.displayName);
+    state.displayName = clampDisplayName(sanitizeDisplayName(state.displayName));
     state.roomId = sanitizeRoomId(roomCodeInput.value);
     playerNameInput.value = state.displayName;
     roomCodeInput.value = state.roomId;
+    storeDisplayName(state.displayName);
     closePlayMenu();
 
     onStart({

@@ -9,7 +9,7 @@ import type {
   RoomSummary,
 } from '@flappy/shared';
 import { Application, Assets, Container, Graphics } from 'pixi.js';
-import type { Spritesheet } from 'pixi.js';
+import type { Spritesheet, Texture } from 'pixi.js';
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config/constants';
 import { DISPLAY_RESOLUTION } from './game/config/display';
 import { ensureUiFontLoaded } from './game/config/font';
@@ -52,6 +52,10 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   }
 
   const atlasTexture = await Assets.load('sprites/game.png');
+  const diceTexture = await Assets.load<Texture>({
+    src: '/dice.svg',
+    data: { resolution: 2 },
+  });
   Assets.add({
     alias: 'game-atlas',
     src: 'sprites/game.json',
@@ -257,6 +261,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
 
   mainMenu = createMainMenu({
     parent: gameRoot,
+    diceTexture,
     onOpen: resetToMenu,
     onStart: async ({ mode, displayName, roomId, durationSeconds }) => {
       activeMode = mode;

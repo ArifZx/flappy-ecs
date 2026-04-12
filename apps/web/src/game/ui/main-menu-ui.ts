@@ -38,6 +38,7 @@ type MenuInputAlign = 'left' | 'center' | 'right';
 type MenuInputOptions = {
   align?: MenuInputAlign;
   withBackground?: boolean;
+  width?: number;
 };
 
 export const PANEL_WIDTH = 220;
@@ -281,11 +282,12 @@ export const createMenuInput = (
   const {
     align = 'left',
     withBackground = true,
+    width = CONTROL_WIDTH,
   } = options;
 
   const input = new Input({
     bg: createInputBackground(
-      CONTROL_WIDTH,
+      width,
       INPUT_HEIGHT,
       withBackground ? 0.16 : 0,
       withBackground ? 0.94 : 0,
@@ -300,7 +302,7 @@ export const createMenuInput = (
       : { top: 10, right: 12, bottom: 10, left: 12 },
     textStyle: inputTextStyle,
   });
-  input.width = CONTROL_WIDTH;
+  input.width = width;
   input.height = INPUT_HEIGHT;
   return input;
 };
