@@ -2,6 +2,7 @@ import type { GameMode } from '@flappy/shared';
 import { FancyButton, Input } from '@pixi/ui';
 import { Graphics, Text } from 'pixi.js';
 
+import { GAME_SFX, playSound } from '../audio/sound';
 import { GAME_WIDTH } from '../config/constants';
 import { DISPLAY_RESOLUTION } from '../config/display';
 import { UI_FONT_FAMILY } from '../config/font';
@@ -232,6 +233,9 @@ export const createUiButton = (
     },
   });
   button.cursor = 'pointer';
+  button.onPress.connect(() => {
+    playSound(GAME_SFX.swoosh);
+  });
 
   const setTheme = (theme: ButtonThemeSet): void => {
     button.defaultView = createButtonView(width, height, 18, theme.idle);

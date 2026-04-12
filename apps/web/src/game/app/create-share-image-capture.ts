@@ -168,22 +168,30 @@ const drawShareLogo = (context: CanvasRenderingContext2D, logoImage: CanvasImage
 const drawShareBrand = (context: CanvasRenderingContext2D): void => {
   const brandX = 184;
   const brandY = SHARE_HEIGHT - 112;
+  const subtitle = 'Tap in. Flap hard. Party louder.';
 
   context.save();
   context.textAlign = 'left';
   context.textBaseline = 'middle';
   context.fillStyle = '#f8efc7';
+  context.strokeStyle = 'rgba(18, 25, 34, 0.92)';
+  context.lineJoin = 'round';
+  context.lineCap = 'round';
   context.shadowColor = 'rgba(8, 18, 29, 0.8)';
   context.shadowBlur = 0;
   context.shadowOffsetX = 0;
   context.shadowOffsetY = 4;
   context.font = `900 48px ${UI_FONT_FAMILY}, sans-serif`;
+  context.lineWidth = 10;
+  context.strokeText(SHARE_BRAND_TITLE, brandX, brandY);
   context.fillText(SHARE_BRAND_TITLE, brandX, brandY);
 
   context.shadowColor = 'transparent';
   context.fillStyle = 'rgba(248, 239, 199, 0.86)';
   context.font = `700 22px ${UI_FONT_FAMILY}, sans-serif`;
-  context.fillText('Tap in. Flap hard. Party louder.', brandX, brandY + 50);
+  context.lineWidth = 6;
+  context.strokeText(subtitle, brandX, brandY + 50);
+  context.fillText(subtitle, brandX, brandY + 50);
   context.restore();
 };
 

@@ -129,6 +129,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   let latestLeaderboard: LeaderboardUpdate | null = null;
   let currentDisplayName = 'Player';
   let activeFriendsRoomId: string | null = null;
+  let activeFriendsStartsAt: number | null = null;
   let activeFriendsEndsAt: number | null = null;
   let activeFriendsDurationSeconds = 0;
   let snapshotAccumulatorMs = 0;
@@ -163,6 +164,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       applyOnlineCourseSeed(summary);
 
       if (summary.status === 'running') {
+        activeFriendsStartsAt = null;
         activeFriendsEndsAt = summary.endsAt ?? null;
         activeFriendsDurationSeconds = summary.config.durationSeconds;
         gameplayEnabled = true;
@@ -180,6 +182,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
           return;
         }
 
+        activeFriendsStartsAt = null;
         activeFriendsEndsAt = null;
         activeFriendsDurationSeconds = state.room.config.durationSeconds;
         gameplayEnabled = false;
@@ -195,9 +198,10 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     onCountdown: (payload) => {
       if (activeMode === 'friends') {
         activeFriendsRoomId = payload.roomId;
-        activeFriendsEndsAt = payload.startsAt + payload.countdownSeconds * 1000;
+        activeFriendsStartsAt = payload.startsAt;
+        activeFriendsEndsAt = null;
         ffaPresence.clear();
-        sessionPanel.showCountdown(payload);
+        sessionPanel.hide();
       }
     },
     onRoomFinished: (payload: RoomFinished) => {
@@ -206,6 +210,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       }
 
       gameplayEnabled = false;
+      activeFriendsStartsAt = null;
       activeFriendsEndsAt = null;
       gameOverActions.setVisible(false);
       gameOverActions.setScreenshotSrc(null);
@@ -216,6 +221,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       gameplayEnabled = false;
       activeMode = 'offline';
       activeFriendsRoomId = null;
+      activeFriendsStartsAt = null;
       activeFriendsEndsAt = null;
       activeFriendsDurationSeconds = 0;
       snapshotAccumulatorMs = 0;
@@ -257,6 +263,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
   const resetToMenu = (): void => {
     gameplayEnabled = false;
     activeFriendsRoomId = null;
+    activeFriendsStartsAt = null;
     activeFriendsEndsAt = null;
     activeFriendsDurationSeconds = 0;
     snapshotAccumulatorMs = 0;
@@ -280,6 +287,7 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
       latestFfaState = null;
       latestLeaderboard = null;
       activeFriendsRoomId = mode === 'friends' ? roomId || null : null;
+      activeFriendsStartsAt = null;
       activeFriendsEndsAt = null;
       activeFriendsDurationSeconds = mode === 'friends' ? durationSeconds : 0;
       ffaPresence.clear();
@@ -376,18 +384,52 @@ const FFA_SNAPSHOT_INTERVAL_MS = 50;
     ffaPresence.update(dt, runtime.getSnapshotState().worldOffset);
 
     const showPartyHud = activeMode === 'friends' && gameplayEnabled && !mainMenu.isOpen();
+    const showCountdownSplash = activeMode === 'friends'
+      && activeFriendsStartsAt !== null
+      && !gameplayEnabled
+      && !mainMenu.isOpen();
     scene.partyHudText.visible = showPartyHud;
-    scene.pointsText.visible = !showPartyHud;
+    scene.countdownSplashLabelText.visible = showCountdownSplash;
+    scene.countdownSplashNumberText.visible = showCountdownSplash;
+    scene.pointsText.visible = !showPartyHud && !showCountdownSplash;
     if (showPartyHud) {
       const remainingSeconds = activeFriendsEndsAt === null
         ? activeFriendsDurationSeconds
         : Math.max(0, Math.ceil((activeFriendsEndsAt - Date.now()) / 1000));
-      scene.partyHudText.text = `PARTY\n${remainingSeconds}`;
+      scene.partyHudText.text = `PARTY TIME!\n${remainingSeconds}`;
+    }
+
+    if (showCountdownSplash) {
+      const countdownStartsAt = activeFriendsStartsAt ?? Date.now();
+      const millisUntilStart = Math.max(0, countdownStartsAt - Date.now());
+      const remainingSeconds = Math.max(0, Math.ceil(millisUntilStart / 1000));
+      const countdownProgress = 1 - Math.min(1, millisUntilStart / 1000);
+      const punchProgress = 1 - ((1 - countdownProgress) * (1 - countdownProgress));
+      const squashX = 1.18 - punchProgress * 0.2;
+      const squashY = 0.82 + punchProgress * 0.46;
+      const bobOffset = Math.sin(countdownProgress * Math.PI) * 6;
+      scene.countdownSplashLabelText.alpha = 0.7 + punchProgress * 0.3;
+      scene.countdownSplashLabelText.scale.set(0.96 + punchProgress * 0.08);
+      scene.countdownSplashNumberText.text = String(remainingSeconds);
+      scene.countdownSplashNumberText.scale.set(squashX, squashY);
+      scene.countdownSplashNumberText.position.set(144, 194 - bobOffset);
+      scene.countdownSplashNumberText.alpha = 0.78 + punchProgress * 0.22;
+      scene.countdownSplashNumberText.angle = Math.sin(countdownProgress * Math.PI * 2) * 2.5;
+      scene.hintText.visible = false;
+    } else {
+      scene.countdownSplashLabelText.scale.set(1);
+      scene.countdownSplashLabelText.alpha = 1;
+      scene.countdownSplashNumberText.scale.set(1);
+      scene.countdownSplashNumberText.position.set(144, 194);
+      scene.countdownSplashNumberText.alpha = 1;
+      scene.countdownSplashNumberText.angle = 0;
     }
 
     if (mainMenu.isOpen()) {
       scene.pointsText.visible = false;
       scene.partyHudText.visible = false;
+      scene.countdownSplashLabelText.visible = false;
+      scene.countdownSplashNumberText.visible = false;
       scene.hintText.visible = false;
       scene.gameOverSprite.visible = false;
     }
